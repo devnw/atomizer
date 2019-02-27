@@ -1,0 +1,5 @@
+package kafka
+
+func init() {
+
+}
