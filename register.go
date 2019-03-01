@@ -13,13 +13,13 @@ var atoms sync.Map
 var sources sync.Map
 
 // Register an atom for execution
-func RegisterAtom(identifier string, atom atom)  {
+func RegisterAtom(identifier string, atom Atom)  {
 	register(&atoms, identifier, atom)
 }
 
 // Register a source to collect atoms from
-func RegisterSource(identifier string, source source)  {
-	register(&sources, identifier, source)
+func RegisterSource(identifier string, conductor Conductor)  {
+	register(&sources, identifier, conductor)
 }
 
 // Using the passed in sync map register the id and item into the

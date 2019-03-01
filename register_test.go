@@ -51,7 +51,7 @@ func TestRegister(t *testing.T) {
 	for _, test := range tests {
 		if err := register(&atoms, test.key, test.value); err == nil {
 			if value, ok := atoms.Load(test.key); ok {
-				if atomValue, ok := value.(atom); ok {
+				if atomValue, ok := value.(Atom); ok {
 					if validator.IsValid(atomValue) {
 						if atomValue.GetId() != test.value.id {
 							t.Errorf("Test key [%s] failed because the value stored doesn't match the value returned", test.key)
