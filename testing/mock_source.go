@@ -1,4 +1,4 @@
-package mocksource
+package testing
 
 import (
 	"context"
@@ -14,15 +14,15 @@ import (
 // TODO: setup a sub package that can be added to add logging metrics to the atomizer so that it will show performance of each atom and which atom is running, etc...
 //  possibly could even include the option to turn on the profiler
 
-func GetMockSource(atoms int, delay *time.Duration, process func(ctx context.Context, payload []byte) (err error)) (source mocksource) {
-	return mocksource{
+func GetMockSource(atoms int, delay *time.Duration, process func(ctx context.Context, payload []byte) (err error)) (source MockSource) {
+	return MockSource{
 		atoms,
 		delay,
 		process,
 	}
 }
 
-type mocksource struct {
+type MockSource struct {
 	atoms int
 	delay *time.Duration
 	process func(ctx context.Context, payload []byte) (err error)
@@ -31,14 +31,14 @@ type mocksource struct {
 // TODO: Atoms are not what is returned from a source, the sources return electrons which are what allow
 //  the atom to do it's work this is in the form of a []byte which allows for atomizer to be serialization agnostic since
 //  the deserialization will occur through the implementation of the atom itself rather than in this atomizer library
-func (this mocksource) GetAtoms() <- chan mockatom {
-	var atomStream = make(chan mockatom)
+func (this MockSource) GetAtoms() <- chan MockAtom {
+	var atomStream = make(chan MockAtom)
 
 	// Push off the atom stream to a go routine and loop through the expected
 	// atoms for mocking
-	go func(aStream chan <- mockatom) {
+	go func(aStream chan <- MockAtom) {
 		for i := 0; i < this.atoms; i++ {
-			var mAtom = mockatom{
+			var mAtom = MockAtom{
 				id: strconv.Itoa(i),
 				status: 1,
 			}
@@ -53,40 +53,4 @@ func (this mocksource) GetAtoms() <- chan mockatom {
 	}(atomStream)
 
 	return atomStream
-}
-
-type mockelectron struct {
-
-}
-
-type mockatom struct {
-	id string
-	status int
-	process func(ctx context.Context, payload []byte) (err error)
-}
-
-func (this mockatom) GetId() (id string) {
-	return this.id
-}
-
-func (this mockatom) GetStatus() (status int) {
-	return this.status
-}
-
-func (this mockatom) Process(ctx context.Context, payload []byte) (err error) {
-
-	// If this mock atom is mocked with a process function then execute the process function
-	// Otherwise just exit
-	if this.process != nil {
-		err = this.process(ctx, payload)
-	}
-
-	return err
-}
-
-func (this mockatom) Panic(ctx context.Context) {
-}
-
-func (this mockatom) Complete(ctx context.Context) (err error) {
-	return err
 }
