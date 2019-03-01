@@ -68,20 +68,25 @@ func (this Atomizer) receive(ctx context.Context, electrons <- chan Electron) (e
 					for {
 						select {
 						case <- ctx.Done():
-						// Do nothing, and let the default false ok break the loop
-						case electron := <- electrons:
-							switch electron.Priority() {
-							case CRITICAL:
-								this.critical <- electron
-							case HIGH:
-								this.high <- electron
-							case MEDIUM:
-								this.medium <- electron
-							case LOW:
-								fallthrough
-							default:
-								// Unknown priority dump to low channel
-								this.low <- electron
+							// Break the loop to close out the receiver
+							break
+						case electron,ok := <- electrons:
+							if ok {
+								switch electron.Priority() {
+								case CRITICAL:
+									this.critical <- electron
+								case HIGH:
+									this.high <- electron
+								case MEDIUM:
+									this.medium <- electron
+								case LOW:
+									fallthrough
+								default:
+									// Unknown priority dump to low channel
+									this.low <- electron
+								}
+							} else { // Channel is closed, break out of the loop
+								break
 							}
 						}
 					}
