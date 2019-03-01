@@ -9,8 +9,8 @@ import (
 // Sync map that contains the atoms available to this instance of atomizer
 var atoms sync.Map
 
-// Sync map that contains the sources available to pull atoms from for this atomizer
-var sources sync.Map
+// Sync map that contains the conductors available to pull atoms from for this atomizer
+var conductors sync.Map
 
 // Register an atom for execution
 func RegisterAtom(identifier string, atom Atom)  {
@@ -19,12 +19,12 @@ func RegisterAtom(identifier string, atom Atom)  {
 
 // Register a source to collect atoms from
 func RegisterSource(identifier string, conductor Conductor)  {
-	register(&sources, identifier, conductor)
+	register(&conductors, identifier, conductor)
 }
 
 // Using the passed in sync map register the id and item into the
 // sync map. This method is primarily used to register map entries
-// as part of the init script for sources and individual atoms
+// as part of the init script for conductors and individual atoms
 func register(smap *sync.Map, id string, item interface{}) (err error) {
 	if len(id) > 0 {
 		if validator.IsValid(item) {
