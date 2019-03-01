@@ -7,4 +7,5 @@ type Electron interface {
 	Payload() (payload []byte)
 	Timeout() (timeout *time.Duration)
 	Priority() (priority int)
+	Validate() (valid bool)
 }
