@@ -5,7 +5,7 @@ import "context"
 type Atom interface {
 	GetId() (id string)
 	GetStatus() (status int)
-	Process(ctx context.Context, payload []byte, electronStream chan <- Electron) (heartbeat <- chan bool, err error)
+	Process(ctx context.Context, payload []byte, estream chan <- Electron) (heartbeat <- chan bool, err error)
 	Validate() (valid bool)
 }
 

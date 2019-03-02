@@ -9,6 +9,9 @@ type Electron interface {
 	Priority() (priority int)
 	Validate() (valid bool)
 
-	// TODO: Need to set it up so that an atom can communicate with the original source by sending messages through a channel which takes electrons
-	Callback() (callback func(results []byte) (err error))
+	// OLD
+	// Need to set it up so that an atom can communicate with the original source by sending messages through a channel which takes electrons
+	// When the electron is sent back to another node a channel is opened by the send method of the source and blocking will occur on reading from that channel
+	// rather than relying on a callback with a waitgroup which is less reliable
+	// Callback(result []byte) (err error)
 }
