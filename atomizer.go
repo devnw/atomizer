@@ -3,6 +3,7 @@ package atomizer
 import (
 	"context"
 	"fmt"
+	"github.com/benji-vesterby/validator"
 	"github.com/pkg/errors"
 	"sync"
 )
@@ -19,24 +20,32 @@ type Atomizer struct {
 	errors		chan error
 	logs		chan string
 	ctx			context.Context
+	cancel		context.CancelFunc
 
 	// Map for storing the context cancellation functions for each source
 	conductorCancelFuncs sync.Map
 
-	// Map for storing the contexts of specific electrons
-	electronCancelFuncs sync.Map
+	// Map for storing the instances of specific electrons
+	electronInstances sync.Map
 }
 
 func Atomize(ctx context.Context) (atomizer Atomizer, err error) {
-
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+	
 	// Initialize the atomizer and establish the channels
 	atomizer = Atomizer{
 		electrons: make(chan Electron),
 		ctx: ctx,
+		cancel: cancel,
 	}
 
 	// Start up the receivers
-	err = atomizer.receive()
+	if err = atomizer.receive(); err == nil {
+
+		// Initialize the bonding of electrons and atoms
+		go atomizer.bond()
+	}
 
 	return atomizer, err
 }
@@ -170,6 +179,7 @@ func (this Atomizer) distribute(ctx context.Context, conductor interface{}, elec
 		select {
 		case <- ctx.Done():
 			// Break the loop to close out the receiver
+			this.sendErr(errors.Errorf("context closed for distribution of conductor [%s]; exiting [%s]", ctx.Err().Error()))
 			break
 		case electron, ok := <- electrons:
 			if ok {
@@ -182,13 +192,102 @@ func (this Atomizer) distribute(ctx context.Context, conductor interface{}, elec
 	}
 }
 
-func (this Atomizer) spin() {
+// Combine an electron and an atom and initiate the processing of the atom in it's own go routine
+func (this Atomizer) bond() {
+	defer func() {
+		if r := recover(); r != nil {
+			this.sendLog("panic in bond; re-initializing bonding")
 
+			// Self Heal - Re-initialize the bondings
+			go this.bond()
+		}
+	}()
+
+	var err error
+
+	for {
+		select {
+			case <- this.ctx.Done():
+				// Context has closed, break the loop
+				this.sendErr(errors.Errorf("context has been closed for bonding; exiting [%s]", this.ctx.Err().Error()))
+				break
+				case electron, ok := <- this.electrons:
+					if ok {
+
+						// Execute the processing for this electron using the atom that is registered
+						go func(electron Electron) {
+
+							// Create an electron instance object to contain internal state information about specific electrons
+							var instance = electronInstance{
+								electron: &electron,
+							}
+
+							// Initialize the new context object for the processing of the electron/atom
+							if electron.Timeout() != nil {
+								// Create a new context for the electron with a timeout
+								instance.ctx, instance.cancel = context.WithTimeout(this.ctx, *electron.Timeout())
+							} else {
+								// Create a new context for the electron with a cancellation option
+								instance.ctx, instance.cancel = context.WithCancel(this.ctx)
+							}
+
+							var atom *Atom
+							if atom, err = this.getAtom(electron.Atom()); err == nil {
+								if validator.IsValid(atom) {
+									instance.atom = atom
+
+									if _, exists := this.electronInstances.LoadOrStore(electron.Id(), instance); !exists {
+
+									} else {
+										// TODO: This electron for id already exists. This needs to error back and it's already being processed
+									}
+								} else {
+									// TODO:
+								}
+							} else {
+								// TODO:
+							}
+						}(electron)
+
+					} else {
+						// Send error indicating that the atomizer is being disassembled due to a closed electron channel
+						this.sendErr(errors.New("electron channel closed; tearing down atomizer"))
+
+						// Cancel the atomizer context to close down go routines
+						this.cancel()
+
+						// Break the loop
+						break
+					}
+		}
+	}
 }
 
-func (this Atomizer) bond(electron Electron) (err error) {
+// Load the atom from the registration sync map and retrieve a new instances
+func (this Atomizer) getAtom(id string) (*Atom, error) {
+	var err	error
+	var atom Atom
 
-	return err
+	if this.Validate() {
+		if a, ok := atoms.Load(id); ok {
+			if atom, ok = a.(Atom); ok {
+
+				atom = atom.New()
+
+				if !validator.IsValid(atom) {
+					err = errors.Errorf("invalid atom stored for id [%s]", id)
+				}
+			} else {
+				err = errors.Errorf("unable to type assert atom for id [%s]", id)
+			}
+		} else {
+			err = errors.Errorf("unable to load atom for id [%s]", id)
+		}
+	} else {
+		err = errors.New("atomizer is invalid")
+	}
+
+	return &atom, err
 }
 
 func (this Atomizer) Exit()  {

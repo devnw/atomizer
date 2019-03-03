@@ -3,9 +3,8 @@ package atomizer
 import "context"
 
 type Atom interface {
-	GetId() (id string)
-	GetStatus() (status int)
-	Process(ctx context.Context, payload []byte, estream chan <- Electron) (heartbeat <- chan bool, err error)
+	New() (atom Atom)
+	Process(ctx context.Context, ein Electron, eout chan <- Electron) (err error)
 	Validate() (valid bool)
 }
 
