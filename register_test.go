@@ -1,47 +1,55 @@
 package atomizer
 
 import (
+	"context"
 	"github.com/benji-vesterby/validator"
 	"sync"
 	"testing"
 )
 
 type atomTestStruct struct {
+}
+
+func (this *atomTestStruct) Validate() (valid bool) {
+	return this != nil
+}
+
+func (this *atomTestStruct) Process(ctx context.Context, electron Electron, outbound chan <- Electron) (result []byte, err error) {
+	return result,err
+}
+
+type nonatomtestregister struct {
 	id string
 }
 
-func (this atomTestStruct) GetId() (id string) {
-	return this.id
-}
-
-func (this atomTestStruct) Validate() (valid bool) {
+func (this *nonatomtestregister) Validate() (valid bool) {
 	return len(this.id) > 0
 }
 
 func TestRegister(t *testing.T) {
 	tests := []struct {
 		key   string
-		value *atomTestStruct
+		value interface{}
 		err   bool
 	}{
 		{ // Valid test
 			"ValidTest",
-			&atomTestStruct{"ValidTest"},
+			&atomTestStruct{},
 			false,
 		},
 		{ // Invalid test because key has length of 0
 			"",
-			&atomTestStruct{"FailKey"},
-			true,
-		},
-		{ // Invalid test because the validate function doesn't allow for empty key
-			"Invalid",
-			&atomTestStruct{""},
+			&atomTestStruct{},
 			true,
 		},
 		{ // Invalid test because the value passed is nil and nil values cannot be registered
 			"FailNil",
 			nil,
+			true,
+		},
+		{ // Invalid test because the struct doesn't implement atom
+			"wronginterface",
+			&nonatomtestregister{},
 			true,
 		},
 	}
@@ -52,11 +60,7 @@ func TestRegister(t *testing.T) {
 		if err := register(&atoms, test.key, test.value); err == nil {
 			if value, ok := atoms.Load(test.key); ok {
 				if atomValue, ok := value.(Atom); ok {
-					if validator.IsValid(atomValue) {
-						if atomValue.GetId() != test.value.id {
-							t.Errorf("Test key [%s] failed because the value stored doesn't match the value returned", test.key)
-						}
-					} else {
+					if !validator.IsValid(atomValue) {
 						t.Errorf("Test key [%s] failed because the returned value was invalid", test.key)
 					}
 				} else {

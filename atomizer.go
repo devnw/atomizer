@@ -184,7 +184,7 @@ func (this *Atomizer) distribute(ctx context.Context, conductor interface{}, ele
 		select {
 		case <- ctx.Done():
 			// Break the loop to close out the receiver
-			this.sendErr(errors.Errorf("context closed for distribution of conductor [%s]; exiting [%s]", ctx.Err().Error()))
+			this.sendErr(errors.Errorf("context closed for distribution of conductor [%s]; exiting [%s]", conductor, ctx.Err().Error()))
 			break
 		case electron, ok := <- electrons:
 			if ok {
