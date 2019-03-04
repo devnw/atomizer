@@ -2,7 +2,6 @@ package testing
 
 import (
 	"context"
-	"strconv"
 	"time"
 )
 
@@ -38,17 +37,17 @@ func (this MockSource) GetAtoms() <- chan MockAtom {
 	// atoms for mocking
 	go func(aStream chan <- MockAtom) {
 		for i := 0; i < this.atoms; i++ {
-			var mAtom = MockAtom{
-				id: strconv.Itoa(i),
-				status: 1,
-			}
+			//var mAtom = MockAtom{
+			//	id: strconv.Itoa(i),
+			//	status: 1,
+			//}
 
-			aStream <- mAtom
-
-			// Sleep if there is a delay in the mock data source
-			if this.delay != nil {
-				time.Sleep(*this.delay)
-			}
+			//aStream <- mAtom
+			//
+			//// Sleep if there is a delay in the mock data source
+			//if this.delay != nil {
+			//	time.Sleep(*this.delay)
+			//}
 		}
 	}(atomStream)
 

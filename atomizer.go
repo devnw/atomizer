@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/benji-vesterby/validator"
 	"github.com/pkg/errors"
+	"reflect"
 	"sync"
 )
 
@@ -26,15 +27,15 @@ type Atomizer struct {
 	conductorCancelFuncs sync.Map
 
 	// Map for storing the instances of specific electrons
-	electronInstances sync.Map
+	instances sync.Map
 }
 
-func Atomize(ctx context.Context) (atomizer Atomizer, err error) {
+func Atomize(ctx context.Context) (atomizer *Atomizer, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
 	
 	// Initialize the atomizer and establish the channels
-	atomizer = Atomizer{
+	atomizer = &Atomizer{
 		electrons: make(chan Electron),
 		ctx: ctx,
 		cancel: cancel,
@@ -51,7 +52,7 @@ func Atomize(ctx context.Context) (atomizer Atomizer, err error) {
 }
 
 // Create a channel to receive errors from the Atomizer and return the channel for logging purposes
-func (this Atomizer) Errors(buffer int) <- chan error {
+func (this *Atomizer) Errors(buffer int) <- chan error {
 	if this.errors == nil {
 
 		// Ensure that a proper buffer size was passed for the channel
@@ -67,7 +68,7 @@ func (this Atomizer) Errors(buffer int) <- chan error {
 }
 
 // Create a channel to receive logs from the Atomizer, and electrons
-func (this Atomizer) Logs(buffer int) <- chan string {
+func (this *Atomizer) Logs(buffer int) <- chan string {
 
 	if this.logs == nil {
 
@@ -84,7 +85,7 @@ func (this Atomizer) Logs(buffer int) <- chan string {
 }
 
 // If the error channel is not nil then send the error on the channel
-func (this Atomizer) sendErr(err error) {
+func (this *Atomizer) sendErr(err error) {
 	if this.errors != nil {
 		go func(err error) {
 			this.errors <- err
@@ -93,7 +94,7 @@ func (this Atomizer) sendErr(err error) {
 }
 
 // if the log channel is not nil then send the log on the channel
-func (this Atomizer) sendLog(log string) {
+func (this *Atomizer) sendLog(log string) {
 	if this.logs != nil {
 		go func(log string) {
 			this.logs <- log
@@ -103,13 +104,13 @@ func (this Atomizer) sendLog(log string) {
 
 // Initialize the go routines that will read from the conductors concurrently while other parts of the
 // atomizer reads in the inputs and executes the instances of electrons
-func (this Atomizer) receive() (err error) {
+func (this *Atomizer) receive() (err error) {
 
 	// Validate inputs
 	if this.ctx != nil {
 
 		// Validate the atomizer instance
-		if this.Validate() {
+		if validator.IsValid(this) {
 
 			// Range over the sources and setup
 			conductors.Range(func(key, value interface{}) bool {
@@ -149,7 +150,7 @@ func (this Atomizer) receive() (err error) {
 }
 
 // Reading in from a specific electron channel of a conductor and drop it onto the atomizer channel for electrons
-func (this Atomizer) distribute(ctx context.Context, conductor interface{}, electrons <- chan Electron) {
+func (this *Atomizer) distribute(ctx context.Context, conductor interface{}, electrons <- chan Electron) {
 	defer func() {
 		if r := recover(); r != nil {
 			this.sendLog(fmt.Sprintf("panic in distribute [%v] for conductor [%s]; restarting distributor", r, conductor))
@@ -193,7 +194,7 @@ func (this Atomizer) distribute(ctx context.Context, conductor interface{}, elec
 }
 
 // Combine an electron and an atom and initiate the processing of the atom in it's own go routine
-func (this Atomizer) bond() {
+func (this *Atomizer) bond() {
 	defer func() {
 		if r := recover(); r != nil {
 			this.sendLog("panic in bond; re-initializing bonding")
@@ -216,10 +217,11 @@ func (this Atomizer) bond() {
 
 						// Execute the processing for this electron using the atom that is registered
 						go func(electron Electron) {
+							// TODO: setup the handler for panics here, and determine what to do in the event of a failure
 
 							// Create an electron instance object to contain internal state information about specific electrons
-							var instance = electronInstance{
-								electron: &electron,
+							var instance = instance{
+								electron: electron,
 							}
 
 							// Initialize the new context object for the processing of the electron/atom
@@ -231,13 +233,23 @@ func (this Atomizer) bond() {
 								instance.ctx, instance.cancel = context.WithCancel(this.ctx)
 							}
 
-							var atom *Atom
+							var atom Atom
 							if atom, err = this.getAtom(electron.Atom()); err == nil {
 								if validator.IsValid(atom) {
 									instance.atom = atom
 
-									if _, exists := this.electronInstances.LoadOrStore(electron.Id(), instance); !exists {
+									// Store the instance of the bonded electron into the sync.Map
+									if _, exists := this.instances.LoadOrStore(electron.Id(), instance); !exists {
 
+										// outbound channel, when setting up the channel for reading it needs to be passed as outbound
+										var outbound = make(chan Electron)
+
+										// Set the instance outbound channel for reading
+										instance.outbound = outbound
+
+										// TODO: Log the execution of the process method here
+										// Execute the process method of the atom
+										err = instance.atom.Process(instance.ctx, instance.electron, outbound)
 									} else {
 										// TODO: This electron for id already exists. This needs to error back and it's already being processed
 									}
@@ -264,21 +276,31 @@ func (this Atomizer) bond() {
 }
 
 // Load the atom from the registration sync map and retrieve a new instances
-func (this Atomizer) getAtom(id string) (*Atom, error) {
+func (this *Atomizer) getAtom(id string) (Atom, error) {
 	var err	error
 	var atom Atom
 
-	if this.Validate() {
+	// Ensure this atomizer is valid
+	if validator.IsValid(this) {
+
+		// Load the atom from the sync.Map
 		if a, ok := atoms.Load(id); ok {
-			if atom, ok = a.(Atom); ok {
 
-				atom = atom.New()
+			// Ensure the value that was registered wasn't stored nil
+			if validator.IsValid(a) {
 
-				if !validator.IsValid(atom) {
-					err = errors.Errorf("invalid atom stored for id [%s]", id)
+				// Initialize a new copy of the atom that was registered
+				newAtom := reflect.New(reflect.TypeOf(a))
+
+				// Type assert the new copy of the atom to an atom so that it can be used for processing
+				// and returned as a pointer for bonding
+				if atom, ok = newAtom.Interface().(Atom); ok {
+					if !validator.IsValid(atom) {
+						err = errors.Errorf("invalid atom stored for id [%s]", id)
+					}
+				} else {
+					err = errors.Errorf("unable to type assert atom for id [%s]", id)
 				}
-			} else {
-				err = errors.Errorf("unable to type assert atom for id [%s]", id)
 			}
 		} else {
 			err = errors.Errorf("unable to load atom for id [%s]", id)
@@ -287,14 +309,14 @@ func (this Atomizer) getAtom(id string) (*Atom, error) {
 		err = errors.New("atomizer is invalid")
 	}
 
-	return &atom, err
+	return atom, err
 }
 
-func (this Atomizer) Exit()  {
+func (this *Atomizer) Exit()  {
 	// Make a clean exit for atomizer
 }
 
-func (this Atomizer) Validate() (valid bool) {
+func (this *Atomizer) Validate() (valid bool) {
 
 	if this.electrons != nil {
 		valid = true
@@ -307,7 +329,7 @@ func (this Atomizer) Validate() (valid bool) {
 // if the sync map contains instances of context.CancelFunc then execute
 // the cancellation method for that id in the sync map, otherwise error to
 // the calling method
-func (this Atomizer) nuke(cmap sync.Map, id string) (err error) {
+func (this *Atomizer) nuke(cmap sync.Map, id string) (err error) {
 	if len(id) > 0 {
 		if cfunc, ok := cmap.Load(id); ok {
 			if cancel, ok := cfunc.(context.CancelFunc); ok {
