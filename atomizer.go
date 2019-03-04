@@ -19,8 +19,8 @@ type Atomizer struct {
 	// Priority Channels
 	electrons	chan ewrappers
 
-	// Map for storing the instances of specific electrons
-	instances chan instance
+	// channel for passing the instance to a monitoring go routine
+	instances 	chan instance
 
 	errors		chan error
 	logs		chan string
@@ -191,7 +191,14 @@ func (this *Atomizer) distribute(ctx context.Context, conductor interface{}, ele
 
 				// pull the conductor from the
 				if cond, err := this.getConductor(conductor); err == nil {
-					this.electrons <- ewrappers{electron,cond}
+
+					// Ensure that the electron being received is valid
+					if validator.IsValid(electron) {
+
+						this.electrons <- ewrappers{electron,cond}
+					} else {
+						// TODO:
+					}
 				} else {
 					// TODO: send an error showing that the processing for this electron couldn't start because the
 					//  conductor was unable to be pulled from the registry
