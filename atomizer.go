@@ -17,7 +17,11 @@ import (
 type Atomizer struct {
 
 	// Priority Channels
-	electrons	chan Electron
+	electrons	chan ewrappers
+
+	// Map for storing the instances of specific electrons
+	instances chan instance
+
 	errors		chan error
 	logs		chan string
 	ctx			context.Context
@@ -25,9 +29,6 @@ type Atomizer struct {
 
 	// Map for storing the context cancellation functions for each source
 	conductorCancelFuncs sync.Map
-
-	// Map for storing the instances of specific electrons
-	instances sync.Map
 }
 
 func Atomize(ctx context.Context) (atomizer *Atomizer, err error) {
@@ -36,10 +37,13 @@ func Atomize(ctx context.Context) (atomizer *Atomizer, err error) {
 	
 	// Initialize the atomizer and establish the channels
 	atomizer = &Atomizer{
-		electrons: make(chan Electron),
+		electrons: make(chan ewrappers),
+		instances: make(chan instance),
 		ctx: ctx,
 		cancel: cancel,
 	}
+
+	// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
 
 	// Start up the receivers
 	if err = atomizer.receive(); err == nil {
@@ -184,7 +188,14 @@ func (this *Atomizer) distribute(ctx context.Context, conductor interface{}, ele
 			break
 		case electron, ok := <- electrons:
 			if ok {
-				this.electrons <- electron
+
+				// pull the conductor from the
+				if cond, err := this.getConductor(conductor); err == nil {
+					this.electrons <- ewrappers{electron,cond}
+				} else {
+					// TODO: send an error showing that the processing for this electron couldn't start because the
+					//  conductor was unable to be pulled from the registry
+				}
 			} else { // Channel is closed, break out of the loop
 				this.sendErr(errors.Errorf("electron channel for conductor [%s] is closed, exiting read cycle", conductor))
 				break
@@ -212,46 +223,54 @@ func (this *Atomizer) bond() {
 				// Context has closed, break the loop
 				this.sendErr(errors.Errorf("context has been closed for bonding; exiting [%s]", this.ctx.Err().Error()))
 				break
-				case electron, ok := <- this.electrons:
+				case ewrap, ok := <- this.electrons:
 					if ok {
 
 						// Execute the processing for this electron using the atom that is registered
-						go func(electron Electron) {
+						go func(ewrap ewrappers) {
 							// TODO: setup the handler for panics here, and determine what to do in the event of a failure
 
 							// Create an electron instance object to contain internal state information about specific electrons
 							var instance = instance{
-								electron: electron,
+								ewrap: ewrap,
 							}
 
 							// Initialize the new context object for the processing of the electron/atom
-							if electron.Timeout() != nil {
+							if ewrap.electron.Timeout() != nil {
 								// Create a new context for the electron with a timeout
-								instance.ctx, instance.cancel = context.WithTimeout(this.ctx, *electron.Timeout())
+								instance.ctx, instance.cancel = context.WithTimeout(this.ctx, *ewrap.electron.Timeout())
 							} else {
 								// Create a new context for the electron with a cancellation option
 								instance.ctx, instance.cancel = context.WithCancel(this.ctx)
 							}
 
 							var atom Atom
-							if atom, err = this.getAtom(electron.Atom()); err == nil {
+							if atom, err = this.getAtom(ewrap.electron.Atom()); err == nil {
 								if validator.IsValid(atom) {
 									instance.atom = atom
 
-									// Store the instance of the bonded electron into the sync.Map
-									if _, exists := this.instances.LoadOrStore(electron.Id(), instance); !exists {
+									// outbound channel, when setting up the channel for reading it needs to be passed as outbound
+									var outbound = make(chan Electron)
 
-										// outbound channel, when setting up the channel for reading it needs to be passed as outbound
-										var outbound = make(chan Electron)
+									// Set the instance outbound channel for reading
+									instance.outbound = outbound
 
-										// Set the instance outbound channel for reading
-										instance.outbound = outbound
+									// Push the instance to the instances channel to be monitored by the Atomizer
+									this.instances <- instance
 
-										// TODO: Log the execution of the process method here
-										// Execute the process method of the atom
-										err = instance.atom.Process(instance.ctx, instance.electron, outbound)
+									// TODO: Log the execution of the process method here
+									// Execute the process method of the atom
+									var result []byte
+									if result, err = instance.atom.Process(instance.ctx, instance.ewrap.electron, outbound); err == nil {
+										// Close any of the monitoring go routines monitoring this atom
+										instance.cancel()
+
+										// TODO: Ensure this is the proper thing to do here?? I think it needs to close this out
+										//  at the conductor rather than here... unless the conductor overrode the call back
+										// Execute the callback for the electron
+										instance.ewrap.electron.Callback(result)
 									} else {
-										// TODO: This electron for id already exists. This needs to error back and it's already being processed
+										// TODO: process method returned an error
 									}
 								} else {
 									// TODO:
@@ -259,7 +278,7 @@ func (this *Atomizer) bond() {
 							} else {
 								// TODO:
 							}
-						}(electron)
+						}(ewrap)
 
 					} else {
 						// Send error indicating that the atomizer is being disassembled due to a closed electron channel
@@ -310,6 +329,35 @@ func (this *Atomizer) getAtom(id string) (Atom, error) {
 	}
 
 	return atom, err
+}
+
+// Load a conductor from the sync map by key
+func (this *Atomizer) getConductor(key interface{}) (conductor Conductor, err error) {
+
+	// Ensure that a proper key has been passed
+	if validator.IsValid(key) {
+
+		// Load the conductor from the sync map
+		if cond, ok := conductors.Load(key); ok {
+
+			// Type assert the conductor
+			if conductor, ok = cond.(Conductor); ok {
+
+				// Run the conductor through validation checks
+				if !validator.IsValid(conductor) {
+					err = errors.Errorf("invalid entry in conductors sync.Map for key [%v]", key)
+				}
+			} else {
+				err = errors.Errorf("unable to type assert value to conductor for key [%v]", key)
+			}
+		} else {
+			err = errors.Errorf("conductor is not registered in sync.Map for key [%v]", key)
+		}
+	} else {
+		err = errors.Errorf("key [%v] for conductors sync.Map is invalid", key)
+	}
+
+	return conductor, err
 }
 
 func (this *Atomizer) Exit()  {

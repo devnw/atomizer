@@ -3,7 +3,7 @@ package atomizer
 import "context"
 
 type instance struct {
-	electron Electron
+	ewrap ewrappers
 	atom Atom
 	outbound <- chan Electron
 	ctx context.Context

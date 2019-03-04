@@ -2,6 +2,11 @@ package atomizer
 
 import "time"
 
+type ewrappers struct {
+	electron Electron
+	conductor Conductor
+}
+
 type Electron interface {
 	Atom() (Id string)
 	Id() (Id string)

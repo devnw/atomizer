@@ -25,8 +25,10 @@ func RegisterSource(identifier string, conductor Conductor)  {
 // Using the passed in sync map register the id and item into the
 // sync map. This method is primarily used to register map entries
 // as part of the init script for conductors and individual atoms
-func register(smap *sync.Map, id string, item interface{}) (err error) {
-	if len(id) > 0 {
+func register(smap *sync.Map, id interface{}, item interface{}) (err error) {
+
+	// Validate the key coming into the register method
+	if validator.IsValid(id) {
 		if validator.IsValid(item) {
 			if _, ok := smap.Load(id); !ok {
 				smap.Store(id, item)
