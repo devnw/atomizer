@@ -2,32 +2,38 @@ package testing
 
 import "time"
 
+// MockElectron is a struct for mocking electrons for unit testing
 type MockElectron struct {
-
 }
 
-func (this MockElectron) Atom() (Id string) {
-	return Id
+// Atom is the mock electron implementation for testing
+func (electron MockElectron) Atom() (ID string) {
+	return ID
 }
 
-func (this MockElectron) Id() (Id string) {
-	return Id
+// ID is the mock electron implementation for testing
+func (electron MockElectron) ID() (ID string) {
+	return ID
 }
 
-func (this MockElectron) Payload() (payload []byte) {
+// Payload is the mock electron implementation for testing
+func (electron MockElectron) Payload() (payload []byte) {
 	return payload
 }
 
-func (this MockElectron) Timeout() (timeout *time.Duration) {
+// Timeout is the mock electron implementation for testing
+func (electron MockElectron) Timeout() (timeout *time.Duration) {
 	return timeout
 }
 
-func (this MockElectron) Validate() (valid bool) {
+// Validate is the mock electron implementation for testing
+func (electron MockElectron) Validate() (valid bool) {
 
 	return valid
 }
 
-func (this MockElectron) Callback(result []byte) (err error) {
+// Callback is the mock electron implementation for testing
+func (electron MockElectron) Callback(result []byte) (err error) {
 
 	return err
 }

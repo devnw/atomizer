@@ -13,30 +13,33 @@ import (
 // TODO: setup a sub package that can be added to add logging metrics to the atomizer so that it will show performance of each atom and which atom is running, etc...
 //  possibly could even include the option to turn on the profiler
 
-func GetMockSource(atoms int, delay *time.Duration, process func(ctx context.Context, payload []byte) (err error)) (source MockSource) {
-	return MockSource{
+// GetMockConductor is a method for creating a mocked source
+func GetMockConductor(atoms int, delay *time.Duration, process func(ctx context.Context, payload []byte) (err error)) (source MockConductor) {
+	return MockConductor{
 		atoms,
 		delay,
 		process,
 	}
 }
 
-type MockSource struct {
-	atoms int
-	delay *time.Duration
+// MockConductor is a struct implementation for mocking the source for unit testing
+type MockConductor struct {
+	atoms   int
+	delay   *time.Duration
 	process func(ctx context.Context, payload []byte) (err error)
 }
 
+// GetAtoms is a method for mocking a source of atoms
 // TODO: Atoms are not what is returned from a source, the sources return electrons which are what allow
 //  the atom to do it's work this is in the form of a []byte which allows for atomizer to be serialization agnostic since
 //  the deserialization will occur through the implementation of the atom itself rather than in this atomizer library
-func (this MockSource) GetAtoms() <- chan MockAtom {
+func (conductor MockConductor) GetAtoms() <-chan MockAtom {
 	var atomStream = make(chan MockAtom)
 
 	// Push off the atom stream to a go routine and loop through the expected
 	// atoms for mocking
-	go func(aStream chan <- MockAtom) {
-		for i := 0; i < this.atoms; i++ {
+	go func(aStream chan<- MockAtom) {
+		for i := 0; i < conductor.atoms; i++ {
 			//var mAtom = MockAtom{
 			//	id: strconv.Itoa(i),
 			//	status: 1,
@@ -45,8 +48,8 @@ func (this MockSource) GetAtoms() <- chan MockAtom {
 			//aStream <- mAtom
 			//
 			//// Sleep if there is a delay in the mock data source
-			//if this.delay != nil {
-			//	time.Sleep(*this.delay)
+			//if conductor.delay != nil {
+			//	time.Sleep(*conductor.delay)
 			//}
 		}
 	}(atomStream)

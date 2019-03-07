@@ -383,7 +383,7 @@ func (atomizer *Atomizer) Validate() (valid bool) {
 // if the sync map contains instances of context.CancelFunc then execute
 // the cancellation method for that id in the sync map, otherwise error to
 // the calling method
-func (atomizer *Atomizer) nuke(cmap sync.Map, id string) (err error) {
+func (atomizer *Atomizer) nuke(cmap *sync.Map, id string) (err error) {
 	if len(id) > 0 {
 		if cfunc, ok := cmap.Load(id); ok {
 			if cancel, ok := cfunc.(context.CancelFunc); ok {

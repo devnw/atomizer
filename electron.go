@@ -11,7 +11,7 @@ type ewrappers struct {
 // instances of each atom for processing.
 type Electron interface {
 	Atom() (ID string)
-	Id() (ID string)
+	ID() (ID string)
 	Payload() (payload []byte)
 	Timeout() (timeout *time.Duration)
 	Validate() (valid bool)
