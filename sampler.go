@@ -6,19 +6,18 @@ package atomizer
 // should be temporarily halted
 type sampler struct {
 	process chan bool
+}
+
+func (sampl sampler) sample() {
 
 }
 
-func (this sampler) sample() {
-
-}
-
-func (this sampler) Wait() {
+func (sampl sampler) Wait() {
 
 	// Only wait if the process channel has been initialized
-	if this.process != nil {
+	if sampl.process != nil {
 
 		// Block on the channel
-		<- this.process
+		<-sampl.process
 	}
 }

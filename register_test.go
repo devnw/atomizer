@@ -10,20 +10,20 @@ import (
 type atomTestStruct struct {
 }
 
-func (this *atomTestStruct) Validate() (valid bool) {
-	return this != nil
+func (atomteststr *atomTestStruct) Validate() (valid bool) {
+	return atomteststr != nil
 }
 
-func (this *atomTestStruct) Process(ctx context.Context, electron Electron, outbound chan <- Electron) (result []byte, err error) {
-	return result,err
+func (atomteststr *atomTestStruct) Process(ctx context.Context, electron Electron, outbound chan<- Electron) (result []byte, err error) {
+	return result, err
 }
 
 type nonatomtestregister struct {
 	id string
 }
 
-func (this *nonatomtestregister) Validate() (valid bool) {
-	return len(this.id) > 0
+func (nonatomtestreg *nonatomtestregister) Validate() (valid bool) {
+	return len(nonatomtestreg.id) > 0
 }
 
 func TestRegister(t *testing.T) {

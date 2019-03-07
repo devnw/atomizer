@@ -3,13 +3,15 @@ package atomizer
 import "time"
 
 type ewrappers struct {
-	electron Electron
+	electron  Electron
 	conductor Conductor
 }
 
+// Electron is the interface which should be implemented by the messages sent through the conductors that trigger
+// instances of each atom for processing.
 type Electron interface {
-	Atom() (Id string)
-	Id() (Id string)
+	Atom() (ID string)
+	Id() (ID string)
 	Payload() (payload []byte)
 	Timeout() (timeout *time.Duration)
 	Validate() (valid bool)

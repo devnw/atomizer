@@ -12,13 +12,13 @@ var atoms sync.Map
 // Sync map that contains the conductors available to pull atoms from for this atomizer
 var conductors sync.Map
 
-// Register an atom for execution
-func RegisterAtom(identifier string, atom Atom)  {
+// RegisterAtom registers an atom for execution
+func RegisterAtom(identifier string, atom Atom) {
 	register(&atoms, identifier, atom)
 }
 
-// Register a source to collect atoms from
-func RegisterSource(identifier string, conductor Conductor)  {
+// RegisterSource registers a source to collect atoms from
+func RegisterSource(identifier string, conductor Conductor) {
 	register(&conductors, identifier, conductor)
 }
 
