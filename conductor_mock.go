@@ -1,4 +1,4 @@
-package testing
+package atomizer
 
 import (
 	"context"
@@ -13,17 +13,17 @@ import (
 // TODO: setup a sub package that can be added to add logging metrics to the atomizer so that it will show performance of each atom and which atom is running, etc...
 //  possibly could even include the option to turn on the profiler
 
-// GetMockConductor is a method for creating a mocked source
-func GetMockConductor(atoms int, delay *time.Duration, process func(ctx context.Context, payload []byte) (err error)) (source MockConductor) {
-	return MockConductor{
+// getmockconductor is a method for creating a mocked source
+func getmockconductor(atoms int, delay *time.Duration, process func(ctx context.Context, payload []byte) (err error)) (source mockconductor) {
+	return mockconductor{
 		atoms,
 		delay,
 		process,
 	}
 }
 
-// MockConductor is a struct implementation for mocking the source for unit testing
-type MockConductor struct {
+// mockconductor is a struct implementation for mocking the source for unit testing
+type mockconductor struct {
 	atoms   int
 	delay   *time.Duration
 	process func(ctx context.Context, payload []byte) (err error)
@@ -33,14 +33,14 @@ type MockConductor struct {
 // TODO: Atoms are not what is returned from a source, the sources return electrons which are what allow
 //  the atom to do it's work this is in the form of a []byte which allows for atomizer to be serialization agnostic since
 //  the deserialization will occur through the implementation of the atom itself rather than in this atomizer library
-func (conductor MockConductor) GetAtoms() <-chan MockAtom {
-	var atomStream = make(chan MockAtom)
+func (conductor mockconductor) GetAtoms() <-chan mockatom {
+	var atomStream = make(chan mockatom)
 
 	// Push off the atom stream to a go routine and loop through the expected
 	// atoms for mocking
-	go func(aStream chan<- MockAtom) {
+	go func(aStream chan<- mockatom) {
 		for i := 0; i < conductor.atoms; i++ {
-			//var mAtom = MockAtom{
+			//var mAtom = mockatom{
 			//	id: strconv.Itoa(i),
 			//	status: 1,
 			//}

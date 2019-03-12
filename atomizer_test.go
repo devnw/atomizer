@@ -2,19 +2,70 @@ package atomizer
 
 import (
 	"context"
-	"github.com/benji-vesterby/validator"
+	"sync"
 	"testing"
 )
 
-// Tests the atomizer creation method
-func TestAtomize(t *testing.T) {
+type invalidconductor struct{}
 
-	if mizer, err := Atomize(context.Background()); err == nil {
-		if !validator.IsValid(mizer) {
-			// TODO:
+type validcondcutor struct{ echan <-chan Electron }
+
+func (cond *validcondcutor) Receive() <-chan Electron                      { return cond.echan }
+func (cond *validcondcutor) Send(electron Electron) (result <-chan []byte) { return nil }
+func (cond *validcondcutor) Validate() (valid bool)                        { return true }
+
+// Tests the atomizer creation method without a conductor
+func TestAtomizeNoConductors(t *testing.T) {
+	tests := []struct {
+		key   string
+		value interface{}
+		err   bool
+	}{
+		{
+			"ValidTestEmptyConductor",
+			nil,
+			false,
+		},
+		{
+			"ValidTestValidConductor",
+			&validcondcutor{make(<-chan Electron)},
+			false,
+		},
+		{
+			"InvalidTestInvalidConductor",
+			&invalidconductor{},
+			true,
+		},
+		{
+			"InvalidTestNilConductor",
+			nil,
+			true,
+		},
+		{
+			"InvalidTestInvalidElectronChan",
+			&validcondcutor{},
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		// Reset sync map for this test
+		conductors = sync.Map{}
+
+		// Store the test conductor
+		if test.err || (!test.err && test.value != nil) {
+			// Store invalid conductor
+			conductors.Store(test.key, test.value)
 		}
-	} else {
-		// TODO:
+
+		if _, err := Atomize(context.Background()); !test.err && err != nil {
+			t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
+		} else if test.err && err == nil {
+			t.Errorf("expected error for test [%s] but received success", test.key)
+		}
+
+		// Cleanup sync map for additional tests
+		conductors = sync.Map{}
 	}
 }
 

@@ -175,7 +175,9 @@ func (mizer *atomizer) receive() (err error) {
 				select {
 				case <-mizer.ctx.Done(): // Do nothing so that the loop breaks immediately
 				default:
+
 					ok, err = mizer.receiveConductor(key, value)
+
 				}
 
 				return ok
@@ -191,27 +193,37 @@ func (mizer *atomizer) receive() (err error) {
 // recieveConductor setups a retrieval loop for the conductor being passed in
 func (mizer *atomizer) receiveConductor(key interface{}, value interface{}) (ok bool, err error) {
 
-	// Create the source context with a cancellation option and store the cancellation in a sync map
-	ctx, ctxFunc := context.WithCancel(mizer.ctx)
-	mizer.conductorCancelFuncs.Store(key, ctxFunc)
+	// Ensure this is a valid conductor
+	if ok = validator.IsValid(value); ok {
 
-	// Type assert the conductor as a Conductor interface
-	var conductor Conductor
-	if conductor, ok = value.(Conductor); ok {
+		// Create the source context with a cancellation option and store the cancellation in a sync map
+		ctx, ctxFunc := context.WithCancel(mizer.ctx)
+		mizer.conductorCancelFuncs.Store(key, ctxFunc)
 
-		// Pull the receive channel from the conductor for new electrons
-		var electrons = conductor.Receive()
+		// Type assert the conductor as a Conductor interface
+		var conductor Conductor
+		if conductor, ok = value.(Conductor); ok {
 
-		// Ensure the channel is valid
-		if electrons != nil {
+			// Pull the receive channel from the conductor for new electrons
+			var electrons = conductor.Receive()
 
-			// Push off the reading into it's own go routine so that it's concurrent
-			mizer.distribute(ctx, key, electrons)
-			ok = true
+			// Ensure the channel is valid
+			if electrons != nil {
+
+				// Push off the reading into it's own go routine so that it's concurrent
+				mizer.distribute(ctx, key, electrons)
+				ok = true
+			} else {
+				err = errors.Errorf("invalid electron channel for conductor [%s]", key)
+			}
 		} else {
-			err = errors.Errorf("invalid electron channel for conductor [%s]", key)
+			err = errors.Errorf("invalid conductor [%v] failed type assertion.", key)
 		}
+
+	} else {
+		err = errors.Errorf("invalid conductor [%v] set to be received", key)
 	}
+
 	return ok, err
 }
 
