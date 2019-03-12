@@ -1,10 +1,21 @@
 package atomizer
 
-import "testing"
+import (
+	"context"
+	"github.com/benji-vesterby/validator"
+	"testing"
+)
 
 // Tests the atomizer creation method
 func TestAtomize(t *testing.T) {
 
+	if mizer, err := Atomize(context.Background()); err == nil {
+		if !validator.IsValid(mizer) {
+			// TODO:
+		}
+	} else {
+		// TODO:
+	}
 }
 
 // Tests the proper functionality of errors passing over the atomizer channel

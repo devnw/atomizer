@@ -74,3 +74,11 @@ func TestRegister(t *testing.T) {
 		}
 	}
 }
+
+func TestRegisterSource(t *testing.T) {
+
+}
+
+func TestRegisterAtom(t *testing.T) {
+
+}
