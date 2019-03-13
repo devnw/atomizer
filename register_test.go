@@ -2,9 +2,10 @@ package atomizer
 
 import (
 	"context"
-	"github.com/benji-vesterby/validator"
 	"sync"
 	"testing"
+
+	"github.com/benji-vesterby/validator"
 )
 
 type atomTestStruct struct {
@@ -14,8 +15,8 @@ func (atomteststr *atomTestStruct) Validate() (valid bool) {
 	return atomteststr != nil
 }
 
-func (atomteststr *atomTestStruct) Process(ctx context.Context, electron Electron, outbound chan<- Electron) (result []byte, err error) {
-	return result, err
+func (atomteststr *atomTestStruct) Process(ctx context.Context, electron Electron, outbound chan<- Electron) (result <-chan []byte, err <-chan error, done <-chan bool) {
+	return result, err, done
 }
 
 type nonatomtestregister struct {

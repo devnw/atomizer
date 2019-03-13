@@ -15,6 +15,7 @@ type Atomizer interface {
 	AddConductor(name string, conductor Conductor) error
 	Errors(buffer int) (<-chan error, error)
 	Logs(buffer int) (<-chan string, error)
+	Properties(buffer int) (<-chan Properties, error)
 	Validate() (valid bool)
 }
 
@@ -64,10 +65,11 @@ type atomizer struct {
 	// channel for passing the instance to a monitoring go routine
 	instances chan instance
 
-	errors chan error
-	logs   chan string
-	ctx    context.Context
-	cancel context.CancelFunc
+	errors     chan error
+	logs       chan string
+	properites chan Properties
+	ctx        context.Context
+	cancel     context.CancelFunc
 
 	// Map for storing the context cancellation functions for each source
 	conductorCancelFuncs sync.Map
@@ -105,6 +107,30 @@ func (mizer *atomizer) AddConductor(name string, conductor Conductor) (err error
 	}
 
 	return err
+}
+
+// properitess initializes the properitess channel if it isn't already allocated and then returns the properites channel of
+// the atomizer so that the requestor can start getting properitess as processing finishes on their atoms
+func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
+	var err error
+
+	// validate the automizer initialization itself
+	if validator.IsValid(mizer) {
+		if mizer.properites == nil {
+
+			// Ensure that a proper buffer size was passed for the channel
+			if buffer < 0 {
+				buffer = 0
+			}
+
+			// Only upon request should the error channel be established meaning a user should read from the channel
+			mizer.properites = make(chan Properties, buffer)
+		}
+	} else {
+		err = errors.New("invalid atomizer")
+	}
+
+	return mizer.properites, err
 }
 
 // Errors creates a channel to receive errors from the atomizer and return the channel for logging purposes
@@ -385,19 +411,49 @@ func (mizer *atomizer) bond() {
 								// Push the instance to the instances channel to be monitored by the mizer
 								mizer.instances <- instance
 
-								// TODO: Log the execution of the process method here
-								// Execute the process method of the atom
-								var result []byte
-								if result, err = instance.atom.Process(instance.ctx, instance.ewrap.electron, outbound); err == nil {
-									// Close any of the monitoring go routines monitoring mizer atom
-									instance.cancel()
+								var prop = &properties{}
 
-									// TODO: Ensure mizer is the proper thing to do here?? I think it needs to close mizer out
-									//  at the conductor rather than here... unless the conductor overrode the call back
-									// Execute the callback for the electron
-									instance.ewrap.electron.Callback(result)
-								} else {
-									// TODO: process method returned an error
+								// TODO: Log the execution of the process method here
+								// TODO: build a properites object for this process here to store the results and errors into as they
+								// stream in from the process method
+								// Execute the process method of the atom
+								var results <-chan []byte
+								var errstream <-chan error
+								var done <-chan bool
+								results, errstream, done = instance.atom.Process(instance.ctx, instance.ewrap.electron, outbound)
+
+								if results != nil && errstream != nil {
+									for {
+										select {
+										case <-mizer.ctx.Done():
+											// TODO:
+										case result, ok := <-results:
+											if ok {
+												prop.AddResult(result)
+											}
+										case err := <-errstream:
+											if ok {
+												prop.AddError(err)
+											}
+										case <-done: // When the done channel closes break the read loop for these channels
+
+											// TODO: Trigger the end time for the properites
+
+											// Close any of the monitoring go routines monitoring mizer atom
+											instance.cancel()
+
+											// TODO: Ensure mizer is the proper thing to do here?? I think it needs to close mizer out
+											//  at the conductor rather than here... unless the conductor overrode the call back
+											// Execute the callback for the electron
+											// TODO: Execute the callback with the noficiation here?
+											// instance.ewrap.electron.Callback(result)
+
+											// Break the loop we're done with this process
+											break
+										default:
+											// TODO:
+										}
+									}
 								}
 							} else {
 								// TODO:
