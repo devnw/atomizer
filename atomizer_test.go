@@ -254,5 +254,18 @@ func BenchmarkAtomizer_Exit100(b *testing.B) {
 
 // Benchmarks the validation method of the atomizer
 func BenchmarkAtomizer_Validate(b *testing.B) {
+	var mizer = &atomizer{
+		electrons: make(chan ewrappers),
+		instances: make(chan instance),
+		ctx:       context.Background(),
+		cancel: context.CancelFunc(func() {
 
+		}),
+	}
+
+	for n := 0; n < b.N; n++ {
+		if !validator.IsValid(mizer) {
+			b.Error("invalid atomizer, expected valid")
+		}
+	}
 }
