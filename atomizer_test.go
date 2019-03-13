@@ -4,15 +4,20 @@ import (
 	"context"
 	"sync"
 	"testing"
+
+	"github.com/benji-vesterby/validator"
 )
 
 type invalidconductor struct{}
 
-type validcondcutor struct{ echan <-chan Electron }
+type validcondcutor struct {
+	echan <-chan Electron
+	valid bool
+}
 
 func (cond *validcondcutor) Receive() <-chan Electron                      { return cond.echan }
 func (cond *validcondcutor) Send(electron Electron) (result <-chan []byte) { return nil }
-func (cond *validcondcutor) Validate() (valid bool)                        { return true }
+func (cond *validcondcutor) Validate() (valid bool)                        { return cond.valid }
 
 // Tests the atomizer creation method without a conductor
 func TestAtomizeNoConductors(t *testing.T) {
@@ -28,7 +33,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 		{
 			"ValidTestValidConductor",
-			&validcondcutor{make(<-chan Electron)},
+			&validcondcutor{make(<-chan Electron), true},
 			false,
 		},
 		{
@@ -69,6 +74,67 @@ func TestAtomizeNoConductors(t *testing.T) {
 	}
 }
 
+func TestAtomizer_AddConductor(t *testing.T) {
+	tests := []struct {
+		key   string
+		value Conductor
+		err   bool
+	}{
+		{
+			"ValidTestEmptyConductor",
+			&validcondcutor{make(<-chan Electron), true},
+			false,
+		},
+		{
+			"InvalidTestConductor",
+			&validcondcutor{make(<-chan Electron), false},
+			true,
+		},
+		{
+			"InvalidTestConductorNilElectron",
+			&validcondcutor{nil, true},
+			true,
+		},
+		{
+			"InvalidTestNilConductor",
+			nil,
+			true,
+		},
+		{
+			"InvalidTestInvalidElectronChan",
+			&validcondcutor{},
+			true,
+		},
+		{ // Empty key test
+			"",
+			&validcondcutor{},
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		// Reset sync map for this test
+		conductors = sync.Map{}
+
+		// Create an instance of the atomizer to test the add conductor with
+		if mizer, err := Atomize(context.Background()); err == nil {
+
+			// Add the conductor
+			if err = mizer.AddConductor(test.key, test.value); !test.err && err != nil {
+				t.Errorf("expected success for test [%s] but received error while adding atomizer [%s]", test.key, err)
+			} else if test.err && err == nil {
+				t.Errorf("expected error for test [%s] but received success", test.key)
+			}
+
+		} else {
+			t.Errorf("expected successfull atomizer creation for test [%s] but received error while initializing atomizer [%s]", test.key, err.Error())
+		}
+
+		// Cleanup sync map for additional tests
+		conductors = sync.Map{}
+	}
+}
+
 // Tests the proper functionality of errors passing over the atomizer channel
 func TestAtomizer_Errors(t *testing.T) {
 
@@ -86,7 +152,84 @@ func TestAtomizer_Logs(t *testing.T) {
 
 // Validates the instance of the atomizer
 func TestAtomizer_Validate(t *testing.T) {
+	tests := []struct {
+		key   string
+		value interface{}
+		err   bool
+	}{
+		{
+			"ValidAtomizerTest",
+			&atomizer{
+				electrons: make(chan ewrappers),
+				instances: make(chan instance),
+				ctx:       context.Background(),
+				cancel: context.CancelFunc(func() {
 
+				}),
+			},
+			false,
+		},
+		{
+			"InvalidAtomizerNilElectrons",
+			&atomizer{
+				electrons: nil,
+				instances: make(chan instance),
+				ctx:       context.Background(),
+				cancel: context.CancelFunc(func() {
+
+				}),
+			},
+			true,
+		},
+		{
+			"InvalidAtomizerNilInstances",
+			&atomizer{
+				electrons: make(chan ewrappers),
+				instances: nil,
+				ctx:       context.Background(),
+				cancel: context.CancelFunc(func() {
+
+				}),
+			},
+			true,
+		},
+		{
+			"InvalidAtomizerNilContext",
+			&atomizer{
+				electrons: make(chan ewrappers),
+				instances: make(chan instance),
+				ctx:       nil,
+				cancel: context.CancelFunc(func() {
+
+				}),
+			},
+			true,
+		},
+		{
+			"InvalidAtomizerNilCancel",
+			&atomizer{
+				electrons: make(chan ewrappers),
+				instances: make(chan instance),
+				ctx:       context.Background(),
+				cancel:    nil,
+			},
+			true,
+		},
+		{
+			"InvalidAtomizerNilAtomizer",
+			nil,
+			true,
+		},
+	}
+
+	for _, test := range tests {
+
+		if ok := validator.IsValid(test.value); !test.err && !ok {
+			t.Errorf("expected success for test [%s] but received failure", test.key)
+		} else if test.err && ok {
+			t.Errorf("expected error for test [%s] but received success", test.key)
+		}
+	}
 }
 
 // Benchmarks the creation of an atomizer instance

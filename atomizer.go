@@ -3,10 +3,11 @@ package atomizer
 import (
 	"context"
 	"fmt"
-	"github.com/benji-vesterby/validator"
-	"github.com/pkg/errors"
 	"reflect"
 	"sync"
+
+	"github.com/benji-vesterby/validator"
+	"github.com/pkg/errors"
 )
 
 // Atomizer interface implementation
@@ -75,12 +76,32 @@ type atomizer struct {
 // AddConductor allows you to add additional conductors to be received from after the atomizer has been created
 func (mizer *atomizer) AddConductor(name string, conductor Conductor) (err error) {
 
-	if err = RegisterSource(name, conductor); err == nil {
-		if _, err = mizer.receiveConductor(name, conductor); err != nil {
-			// TODO:
+	// validate the automizer initialization itself
+	if validator.IsValid(mizer) {
+
+		// Ensure the name for this conductor is valid
+		if len(name) > 0 {
+
+			// Determine if the conductor is valid
+			if validator.IsValid(conductor) {
+
+				// Register the source in the sync map for the conductors
+				if err = RegisterSource(name, conductor); err == nil {
+
+					if _, err = mizer.receiveConductor(name, conductor); err != nil {
+						err = errors.Errorf("error while receiving conductor [%s] : [%s]", name, err.Error())
+					}
+				} else {
+					err = errors.Errorf("error while registering conductor [%s] : [%s]", name, err.Error())
+				}
+			} else {
+				err = errors.Errorf("error while registering conductor [%s]. conductor is invalid.", name)
+			}
+		} else {
+			err = errors.New("attempted to add a conductor with an empty name")
 		}
 	} else {
-		// TODO:
+		err = errors.New("invalid atomizer")
 	}
 
 	return err
