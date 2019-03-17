@@ -7,6 +7,9 @@ type Conductor interface {
 	// Receive gets the atoms from the source that are available to atomize
 	Receive() <-chan Electron
 
+	// Complete mark the completion of an electron instance with applicable statistics
+	Complete(properties Properties)
+
 	// Send sends electrons back out through the conductor for additional processing
 	Send(electron Electron) (result <-chan []byte)
 

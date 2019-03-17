@@ -15,8 +15,8 @@ func (atomteststr *atomTestStruct) Validate() (valid bool) {
 	return atomteststr != nil
 }
 
-func (atomteststr *atomTestStruct) Process(ctx context.Context, electron Electron, outbound chan<- Electron) (result <-chan []byte, err <-chan error, done <-chan bool) {
-	return result, err, done
+func (atomteststr *atomTestStruct) Process(ctx context.Context, electron Electron, outbound chan<- Electron) (result <-chan []byte, err <-chan error) {
+	return result, err
 }
 
 type nonatomtestregister struct {

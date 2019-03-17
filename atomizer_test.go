@@ -18,6 +18,7 @@ type validcondcutor struct {
 func (cond *validcondcutor) Receive() <-chan Electron                      { return cond.echan }
 func (cond *validcondcutor) Send(electron Electron) (result <-chan []byte) { return nil }
 func (cond *validcondcutor) Validate() (valid bool)                        { return cond.valid }
+func (cond *validcondcutor) Complete(properties Properties)                {}
 
 // Tests the atomizer creation method without a conductor
 func TestAtomizeNoConductors(t *testing.T) {

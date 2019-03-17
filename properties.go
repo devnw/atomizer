@@ -4,8 +4,10 @@ import (
 	"time"
 )
 
+// TODO: Set it up so that requests can be made to check the properties of a bonded electron / atom at runtime
+
 // Properties tracks the performance, status and errors that occur in an atom to be passed to the original requestor
-// This should be returned to the sender over a notification channel
+// This should be returned to the sender over a properites channel
 type Properties interface {
 
 	// StartTime indicates the time the processing of an atom began (UTC)
@@ -69,7 +71,7 @@ func (prop *properties) Results() (results [][]byte) {
 	return prop.results
 }
 
-// AddResult adds a result entry to the notification
+// AddResult adds a result entry to the properites
 func (prop *properties) AddResult(result []byte) {
 
 	// Only add the result if it's a valid result
@@ -78,7 +80,7 @@ func (prop *properties) AddResult(result []byte) {
 	}
 }
 
-// AddError adds an error entry to the notification
+// AddError adds an error entry to the properites
 func (prop *properties) AddError(err error) {
 
 	// Only add the error if it's non-nil

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/benji-vesterby/validator"
 	"github.com/pkg/errors"
@@ -275,7 +276,7 @@ func (mizer *atomizer) receiveConductor(key interface{}, value interface{}) (ok 
 					mizer.distribute(ctx, key, electrons)
 					ok = true
 				} else {
-					err = errors.Errorf("invalid electron channel for conductor [%s]", key)
+					err = errors.Errorf("invalid electron channel for conductor [%v]", key)
 				}
 			} else {
 				err = errors.Errorf("invalid conductor [%v] failed type assertion.", key)
@@ -293,17 +294,17 @@ func (mizer *atomizer) receiveConductor(key interface{}, value interface{}) (ok 
 }
 
 // Reading in from a specific electron channel of a conductor and drop it onto the atomizer channel for electrons
-func (mizer *atomizer) distribute(ctx context.Context, conductor interface{}, electrons <-chan Electron) {
+func (mizer *atomizer) distribute(ctx context.Context, conductor interface{}, electrons <-chan Electron) (err error) {
 	if validator.IsValid(mizer) {
 		go func(ctx context.Context, conductor interface{}, electrons <-chan Electron) {
 			defer func() {
 				if r := recover(); r != nil {
-					mizer.sendLog(fmt.Sprintf("panic in distribute [%v] for conductor [%s]; restarting distributor", r, conductor))
+					mizer.sendLog(fmt.Sprintf("panic in distribute [%v] for conductor [%v]; restarting distributor", r, conductor))
 
 					// Self Heal - Re-initialize mizer distribute method in event of panic
 					go mizer.distribute(ctx, conductor, electrons)
 
-				} else { // TODO: Determine if mizer is the correct action if the electron channel is closed
+				} else {
 					// clean up the cancel method for mizer conductor and close the context
 					if cFunc, ok := mizer.conductorCancelFuncs.Load(conductor); ok {
 
@@ -312,10 +313,12 @@ func (mizer *atomizer) distribute(ctx context.Context, conductor interface{}, el
 
 							// Execute the cancel method for mizer conductor
 							cancel()
-							mizer.sendLog(fmt.Sprintf("context for conductor [%s] successfully cancelled", conductor))
+							mizer.sendLog(fmt.Sprintf("context for conductor [%v] successfully cancelled", conductor))
+						} else {
+							panic(fmt.Sprintf("unable to close context for conductor [%v] in atomizer", conductor))
 						}
 					} else {
-						mizer.sendErr(errors.Errorf("unable to find context cancellation function for conductor [%s]", conductor))
+						panic(fmt.Sprintf("unable to find context cancellation function for conductor [%v]", conductor))
 					}
 				}
 			}()
@@ -325,35 +328,39 @@ func (mizer *atomizer) distribute(ctx context.Context, conductor interface{}, el
 				select {
 				case <-ctx.Done():
 					// Break the loop to close out the receiver
-					mizer.sendErr(errors.Errorf("context closed for distribution of conductor [%s]; exiting [%s]", conductor, ctx.Err().Error()))
+					mizer.sendErr(errors.Errorf("context closed for distribution of conductor [%v]; exiting [%s]", conductor, ctx.Err().Error()))
 					break
 				case electron, ok := <-electrons:
 					if ok {
 
-						// pull the conductor from the
+						// pull the conductor from the sync map so that we can link up the atom with the conductor for spawning new electrons
 						if cond, err := mizer.getConductor(conductor); err == nil {
 
 							// Ensure that the electron being received is valid
 							if validator.IsValid(electron) {
 
+								// Send the electron down the electrons channel to be processed
 								mizer.electrons <- ewrappers{electron, cond}
 							} else {
-								// TODO:
+								mizer.sendErr(errors.Errorf("invalid electron passed to atomizer [%v]", electron))
 							}
 						} else {
-							// TODO: send an error showing that the processing for mizer electron couldn't start because the
-							//  conductor was unable to be pulled from the registry
+							// send an error showing that the processing for mizer electron couldn't start because the
+							// conductor was unable to be pulled from the registry
+							mizer.sendErr(errors.Errorf("unable to queue electron [%v] due to error while retrieving conductor [%v]", electron, conductor))
 						}
 					} else { // Channel is closed, break out of the loop
-						mizer.sendErr(errors.Errorf("electron channel for conductor [%s] is closed, exiting read cycle", conductor))
+						mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", conductor))
 						break
 					}
 				}
 			}
 		}(ctx, conductor, electrons)
 	} else {
-		// TODO:
+		err = errors.New("mizer is invalid")
 	}
+
+	return err
 }
 
 // Combine an electron and an atom and initiate the processing of the atom in it's own go routine
@@ -381,8 +388,24 @@ func (mizer *atomizer) bond() {
 
 					// Execute the processing for mizer electron using the atom that is registered
 					go func(ewrap ewrappers) {
-						// TODO: setup the handler for panics here, and determine what to do in the event of a failure
+						// Initizlize properties for this electron for tracking information
+						var prop = &properties{
+							status: PENDING,
+						}
 
+						// panic handler here in the event of the bonded atom and electron failing processing so that it doesn't
+						// take down the whole atomizer and the sender knows about the issues by sending back through the conductor
+						defer func() {
+							if r := recover(); r != nil {
+								// Complete the electron at the conductor level with the property information
+								ewrap.conductor.Complete(prop)
+
+								// Log the error
+								mizer.sendErr(errors.Errorf("panic in execution of electron [%s]", ewrap.electron.ID()))
+							}
+						}()
+
+						// TODO: Register this instance with the sampler so that it's monitored at runtime for heartbeats, etc...
 						// Create an electron instance object to contain internal state information about specific electrons
 						var instance = instance{
 							ewrap: ewrap,
@@ -405,61 +428,69 @@ func (mizer *atomizer) bond() {
 								// outbound channel, when setting up the channel for reading it needs to be passed as outbound
 								var outbound = make(chan Electron)
 
+								// TODO: Register the outbound channel with the conductor that created this instance
 								// Set the instance outbound channel for reading
 								instance.outbound = outbound
 
 								// Push the instance to the instances channel to be monitored by the mizer
 								mizer.instances <- instance
 
-								var prop = &properties{}
-
 								// TODO: Log the execution of the process method here
 								// TODO: build a properites object for this process here to store the results and errors into as they
+								// TODO: Setup with a heartbeat for monitoring processing of the bonded atom
 								// stream in from the process method
 								// Execute the process method of the atom
 								var results <-chan []byte
 								var errstream <-chan error
-								var done <-chan bool
-								results, errstream, done = instance.atom.Process(instance.ctx, instance.ewrap.electron, outbound)
+								results, errstream = instance.atom.Process(instance.ctx, instance.ewrap.electron, outbound)
 
-								if results != nil && errstream != nil {
-									for {
-										select {
-										case <-mizer.ctx.Done():
-											// TODO:
-										case result, ok := <-results:
-											if ok {
-												prop.AddResult(result)
-											}
-										case err := <-errstream:
-											if ok {
-												prop.AddError(err)
-											}
-										case <-done: // When the done channel closes break the read loop for these channels
+								// Update the status of the bonded atom/electron to show processing
+								prop.status = PROCESSING
 
-											// TODO: Trigger the end time for the properites
-
-											// Close any of the monitoring go routines monitoring mizer atom
-											instance.cancel()
-
-											// TODO: Ensure mizer is the proper thing to do here?? I think it needs to close mizer out
-											//  at the conductor rather than here... unless the conductor overrode the call back
-											// Execute the callback for the electron
-											// TODO: Execute the callback with the noficiation here?
-											// instance.ewrap.electron.Callback(result)
-
-											// Break the loop we're done with this process
-											break
-										default:
-											// TODO:
+								// Continue looping while either of the channels is non-nil and open
+								for results != nil || errstream != nil {
+									select {
+									// Monitor the instance context for cancellation
+									case <-instance.ctx.Done():
+										mizer.sendLog(fmt.Sprintf("cancelling electron instance [%v] due to cancellation [%s]", ewrap.electron.ID(), instance.ctx.Err().Error()))
+									case result, ok := <-results:
+										// Append the results from the bonded instance for return through the properties
+										if ok {
+											prop.AddResult(result)
+										} else {
+											// nil out the result channel after it's closed so that the loop breaks
+											result = nil
+										}
+									case err := <-errstream:
+										// Append the errors from the bonded instance for return through the properties
+										if ok {
+											prop.AddError(err)
+										} else {
+											// nil out the err channel after it's closed so that the loop breaks
+											errstream = nil
 										}
 									}
 								}
+
+								// TODO: The processing has finished for this bonded atom and the results need to be calculated and the properties sent back to the
+								// conductor
+
+								// Set the end time and status in the properties
+								prop.end = time.Now()
+								prop.status = COMPLETED
+
+								// TODO: Ensure mizer is the proper thing to do here?? I think it needs to close mizer out
+								//  at the conductor rather than here... unless the conductor overrode the call back
+
+								// TODO: Execute the callback with the noficiation here?
+
+								// TODO: Execute the electron callback here
+								instance.ewrap.electron.Callback(prop)
 							} else {
-								// TODO:
+								mizer.sendErr(errors.Errorf("invalid atom [%s] loaded from registry", ewrap.electron.Atom()))
 							}
 						} else {
-							// TODO:
+							mizer.sendErr(errors.Errorf("error occurred while loading atom [%s] from registry", ewrap.electron.Atom()))
 						}
 					}(ewrap)
 
@@ -476,7 +507,9 @@ func (mizer *atomizer) bond() {
 			}
 		}
 	} else {
-		// TODO:
+		// Panic because this is always called as a go routine and will
+		// hide errors otherwise so crash the application
+		panic("mizer is invalid")
 	}
 }
 
@@ -550,6 +583,7 @@ func (mizer *atomizer) getConductor(key interface{}) (conductor Conductor, err e
 	return conductor, err
 }
 
+// TODO: determine if this is still necessary
 // Pull from a sync map containing cancellation functions for contexts
 // if the sync map contains instances of context.CancelFunc then execute
 // the cancellation method for that id in the sync map, otherwise error to
