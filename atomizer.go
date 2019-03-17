@@ -68,7 +68,7 @@ type atomizer struct {
 
 	errors     chan error
 	logs       chan string
-	properites chan Properties
+	properties chan Properties
 	ctx        context.Context
 	cancel     context.CancelFunc
 
@@ -110,14 +110,14 @@ func (mizer *atomizer) AddConductor(name string, conductor Conductor) (err error
 	return err
 }
 
-// properitess initializes the properitess channel if it isn't already allocated and then returns the properites channel of
-// the atomizer so that the requestor can start getting properitess as processing finishes on their atoms
+// properties initializes the properties channel if it isn't already allocated and then returns the properties channel of
+// the atomizer so that the requestor can start getting properties as processing finishes on their atoms
 func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
 	var err error
 
 	// validate the automizer initialization itself
 	if validator.IsValid(mizer) {
-		if mizer.properites == nil {
+		if mizer.properties == nil {
 
 			// Ensure that a proper buffer size was passed for the channel
 			if buffer < 0 {
@@ -125,13 +125,13 @@ func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
 			}
 
 			// Only upon request should the error channel be established meaning a user should read from the channel
-			mizer.properites = make(chan Properties, buffer)
+			mizer.properties = make(chan Properties, buffer)
 		}
 	} else {
 		err = errors.New("invalid atomizer")
 	}
 
-	return mizer.properites, err
+	return mizer.properties, err
 }
 
 // Errors creates a channel to receive errors from the atomizer and return the channel for logging purposes
@@ -436,7 +436,7 @@ func (mizer *atomizer) bond() {
 								mizer.instances <- instance
 
 								// TODO: Log the execution of the process method here
-								// TODO: build a properites object for this process here to store the results and errors into as they
+								// TODO: build a properties object for this process here to store the results and errors into as they
 								// TODO: Setup with a heartbeat for monitoring processing of the bonded atom
 								// stream in from the process method
 								// Execute the process method of the atom

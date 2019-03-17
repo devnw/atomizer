@@ -7,7 +7,7 @@ import (
 // TODO: Set it up so that requests can be made to check the properties of a bonded electron / atom at runtime
 
 // Properties tracks the performance, status and errors that occur in an atom to be passed to the original requestor
-// This should be returned to the sender over a properites channel
+// This should be returned to the sender over a properties channel
 type Properties interface {
 
 	// StartTime indicates the time the processing of an atom began (UTC)
@@ -22,7 +22,7 @@ type Properties interface {
 	// Status is the status of the atom at the time the processing completed
 	Status() (status int)
 
-	// Errors returns the list of errors that occured on this atom after all the processing had been completed
+	// Errors returns the list of errors that occurred on this atom after all the processing had been completed
 	Errors() (errors []error)
 
 	// Results returns the list of results which are also byte slices
@@ -61,7 +61,7 @@ func (prop *properties) Status() (status int) {
 	return prop.status
 }
 
-// Errors returns the list of errors that occured on this atom after all the processing had been completed
+// Errors returns the list of errors that occurred on this atom after all the processing had been completed
 func (prop *properties) Errors() (errors []error) {
 	return prop.errs
 }
@@ -71,7 +71,7 @@ func (prop *properties) Results() (results [][]byte) {
 	return prop.results
 }
 
-// AddResult adds a result entry to the properites
+// AddResult adds a result entry to the properties
 func (prop *properties) AddResult(result []byte) {
 
 	// Only add the result if it's a valid result
@@ -80,7 +80,7 @@ func (prop *properties) AddResult(result []byte) {
 	}
 }
 
-// AddError adds an error entry to the properites
+// AddError adds an error entry to the properties
 func (prop *properties) AddError(err error) {
 
 	// Only add the error if it's non-nil

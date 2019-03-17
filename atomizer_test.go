@@ -128,7 +128,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 			}
 
 		} else {
-			t.Errorf("expected successfull atomizer creation for test [%s] but received error while initializing atomizer [%s]", test.key, err.Error())
+			t.Errorf("expected successful atomizer creation for test [%s] but received error while initializing atomizer [%s]", test.key, err.Error())
 		}
 
 		// Cleanup sync map for additional tests
