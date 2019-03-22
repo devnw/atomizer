@@ -5,4 +5,4 @@
 [![GoDoc](https://godoc.org/github.com/benji-vesterby/atomizer?status.svg)](https://godoc.org/github.com/benji-vesterby/atomizer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Library that facilitates the execution of atomic actions in distributed algorithms across nodes using message queues or in memory communication
+Atomizer is a library that facilitates the execution of distributed atomic actions across a cluster of nodes.
