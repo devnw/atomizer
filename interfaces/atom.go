@@ -1,4 +1,4 @@
-package atomizer
+package interfaces
 
 import "context"
 

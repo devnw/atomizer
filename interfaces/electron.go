@@ -1,11 +1,6 @@
-package atomizer
+package interfaces
 
 import "time"
-
-type ewrappers struct {
-	electron  Electron
-	conductor Conductor
-}
 
 // Electron is the interface which should be implemented by the messages sent through the conductors that trigger
 // instances of each atom for processing.

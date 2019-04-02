@@ -5,20 +5,23 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/benji-vesterby/atomizer/interfaces"
 	"github.com/benji-vesterby/validator"
 )
 
 type invalidconductor struct{}
 
 type validcondcutor struct {
-	echan <-chan Electron
+	id    string
+	echan <-chan interfaces.Electron
 	valid bool
 }
 
-func (cond *validcondcutor) Receive() <-chan Electron                      { return cond.echan }
-func (cond *validcondcutor) Send(electron Electron) (result <-chan []byte) { return nil }
-func (cond *validcondcutor) Validate() (valid bool)                        { return cond.valid }
-func (cond *validcondcutor) Complete(properties Properties)                {}
+func (cond *validcondcutor) ID() string                                               { return cond.id }
+func (cond *validcondcutor) Receive() <-chan interfaces.Electron                      { return cond.echan }
+func (cond *validcondcutor) Send(electron interfaces.Electron) (result <-chan []byte) { return nil }
+func (cond *validcondcutor) Validate() (valid bool)                                   { return cond.valid }
+func (cond *validcondcutor) Complete(properties interfaces.Properties)                {}
 
 // Tests the atomizer creation method without a conductor
 func TestAtomizeNoConductors(t *testing.T) {
@@ -34,7 +37,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 		{
 			"ValidTestValidConductor",
-			&validcondcutor{make(<-chan Electron), true},
+			&validcondcutor{"ValidTestValidConductor", make(<-chan interfaces.Electron), true},
 			false,
 		},
 		{
@@ -78,22 +81,22 @@ func TestAtomizeNoConductors(t *testing.T) {
 func TestAtomizer_AddConductor(t *testing.T) {
 	tests := []struct {
 		key   string
-		value Conductor
+		value interfaces.Conductor
 		err   bool
 	}{
 		{
 			"ValidTestEmptyConductor",
-			&validcondcutor{make(<-chan Electron), true},
+			&validcondcutor{"ValidTestEmptyConductor", make(<-chan interfaces.Electron), true},
 			false,
 		},
 		{
 			"InvalidTestConductor",
-			&validcondcutor{make(<-chan Electron), false},
+			&validcondcutor{"InvalidTestConductor", make(<-chan interfaces.Electron), false},
 			true,
 		},
 		{
 			"InvalidTestConductorNilElectron",
-			&validcondcutor{nil, true},
+			&validcondcutor{"InvalidTestConductorNilElectron", nil, true},
 			true,
 		},
 		{
@@ -121,7 +124,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 		if mizer, err := Atomize(context.Background()); err == nil {
 
 			// Add the conductor
-			if err = mizer.AddConductor(test.key, test.value); !test.err && err != nil {
+			if err = mizer.AddConductor(test.value); !test.err && err != nil {
 				t.Errorf("expected success for test [%s] but received error while adding atomizer [%s]", test.key, err)
 			} else if test.err && err == nil {
 				t.Errorf("expected error for test [%s] but received success", test.key)

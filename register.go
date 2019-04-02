@@ -1,9 +1,11 @@
 package atomizer
 
 import (
+	"sync"
+
+	"github.com/benji-vesterby/atomizer/interfaces"
 	"github.com/benji-vesterby/validator"
 	"github.com/pkg/errors"
-	"sync"
 )
 
 // Sync map that contains the atoms available to this instance of atomizer
@@ -13,13 +15,13 @@ var atoms sync.Map
 var conductors sync.Map
 
 // RegisterAtom registers an atom for execution
-func RegisterAtom(identifier string, atom Atom) (err error) {
+func RegisterAtom(identifier string, atom interfaces.Atom) (err error) {
 	return register(&atoms, identifier, atom)
 }
 
 // RegisterSource registers a source to collect atoms from
-func RegisterSource(identifier string, conductor Conductor) (err error) {
-	return register(&conductors, identifier, conductor)
+func RegisterSource(conductor interfaces.Conductor) (err error) {
+	return register(&conductors, conductor.ID(), conductor)
 }
 
 // Using the passed in sync map register the id and item into the

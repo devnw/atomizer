@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/benji-vesterby/atomizer/interfaces"
 	"github.com/benji-vesterby/validator"
 )
 
@@ -15,7 +16,7 @@ func (atomteststr *atomTestStruct) Validate() (valid bool) {
 	return atomteststr != nil
 }
 
-func (atomteststr *atomTestStruct) Process(ctx context.Context, electron Electron, outbound chan<- Electron) (result <-chan []byte, err <-chan error) {
+func (atomteststr *atomTestStruct) Process(ctx context.Context, electron interfaces.Electron, outbound chan<- interfaces.Electron) (result <-chan []byte, err <-chan error) {
 	return result, err
 }
 
@@ -60,7 +61,7 @@ func TestRegister(t *testing.T) {
 	for _, test := range tests {
 		if err := register(&atoms, test.key, test.value); err == nil {
 			if value, ok := atoms.Load(test.key); ok {
-				if atomValue, ok := value.(Atom); ok {
+				if atomValue, ok := value.(interfaces.Atom); ok {
 					if !validator.IsValid(atomValue) {
 						t.Errorf("Test key [%s] failed because the returned value was invalid", test.key)
 					}
