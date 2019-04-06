@@ -55,7 +55,7 @@ func (mizer *atomizer) Register(value interface{}) (err error) {
 	// validate the automizer initialization itself
 	if validator.IsValid(mizer) {
 
-		// Pass the value on the registrations channel to be recieved
+		// Pass the value on the registrations channel to be received
 		mizer.registrations <- value
 	} else {
 		err = errors.New("invalid object to register")

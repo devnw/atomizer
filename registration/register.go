@@ -22,7 +22,7 @@ func Registrations(ctx context.Context) <-chan interface{} {
 	regchan = make(chan interface{})
 
 	// Execute a singleton instance to read the pre-registations from the sync.Map for init registrations
-	// and push those to a channel for use by the reciever
+	// and push those to a channel for use by the receiver
 	go preRegSingleton.Do(func() {
 
 		// Range over the map and pass back through channel
