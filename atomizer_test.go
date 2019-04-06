@@ -2,8 +2,9 @@ package atomizer
 
 import (
 	"context"
-	"sync"
 	"testing"
+
+	"github.com/benji-vesterby/atomizer/registration"
 
 	"github.com/benji-vesterby/atomizer/interfaces"
 	"github.com/benji-vesterby/validator"
@@ -59,12 +60,12 @@ func TestAtomizeNoConductors(t *testing.T) {
 
 	for _, test := range tests {
 		// Reset sync map for this test
-		conductors = sync.Map{}
+		registration.Clean()
 
 		// Store the test conductor
 		if test.err || (!test.err && test.value != nil) {
 			// Store invalid conductor
-			conductors.Store(test.key, test.value)
+			registration.Register(test.key, test.value)
 		}
 
 		if _, err := Atomize(context.Background()); !test.err && err != nil {
@@ -74,7 +75,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		}
 
 		// Cleanup sync map for additional tests
-		conductors = sync.Map{}
+		registration.Clean()
 	}
 }
 
@@ -118,13 +119,13 @@ func TestAtomizer_AddConductor(t *testing.T) {
 
 	for _, test := range tests {
 		// Reset sync map for this test
-		conductors = sync.Map{}
+		registration.Clean()
 
 		// Create an instance of the atomizer to test the add conductor with
 		if mizer, err := Atomize(context.Background()); err == nil {
 
 			// Add the conductor
-			if err = mizer.AddConductor(test.value); !test.err && err != nil {
+			if err = mizer.Register(test.value); !test.err && err != nil {
 				t.Errorf("expected success for test [%s] but received error while adding atomizer [%s]", test.key, err)
 			} else if test.err && err == nil {
 				t.Errorf("expected error for test [%s] but received success", test.key)
@@ -135,7 +136,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 		}
 
 		// Cleanup sync map for additional tests
-		conductors = sync.Map{}
+		registration.Clean()
 	}
 }
 

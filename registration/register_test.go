@@ -1,8 +1,7 @@
-package atomizer
+package registration
 
 import (
 	"context"
-	"sync"
 	"testing"
 
 	"github.com/benji-vesterby/atomizer/interfaces"
@@ -10,6 +9,7 @@ import (
 )
 
 type atomTestStruct struct {
+	id string
 }
 
 func (atomteststr *atomTestStruct) Validate() (valid bool) {
@@ -19,6 +19,8 @@ func (atomteststr *atomTestStruct) Validate() (valid bool) {
 func (atomteststr *atomTestStruct) Process(ctx context.Context, electron interfaces.Electron, outbound chan<- interfaces.Electron) (result <-chan []byte, err <-chan error) {
 	return result, err
 }
+
+func (atomteststr *atomTestStruct) ID() string { return atomteststr.id }
 
 type nonatomtestregister struct {
 	id string
@@ -56,11 +58,11 @@ func TestRegister(t *testing.T) {
 		},
 	}
 
-	atoms = sync.Map{}
+	Clean()
 
 	for _, test := range tests {
-		if err := register(&atoms, test.key, test.value); err == nil {
-			if value, ok := atoms.Load(test.key); ok {
+		if err := Register(test.key, test.value); err == nil {
+			if value, ok := preRegistrations.Load(test.key); ok {
 				if atomValue, ok := value.(interfaces.Atom); ok {
 					if !validator.IsValid(atomValue) {
 						t.Errorf("Test key [%s] failed because the returned value was invalid", test.key)

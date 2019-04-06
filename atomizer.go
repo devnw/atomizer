@@ -25,11 +25,16 @@ type atomizer struct {
 	// channel for passing the instance to a monitoring go routine
 	instances chan instance
 
+	// This communicates the different conductors and atoms that are registered
+	// into the system while it's alive
+	registrations chan interface{}
+
 	errors     chan error
 	logs       chan string
 	properties chan interfaces.Properties
 	ctx        context.Context
 	cancel     context.CancelFunc
+	atoms      sync.Map
 
 	// Map for storing the context cancellation functions for each source
 	conductorCancelFuncs sync.Map
@@ -55,46 +60,88 @@ func (mizer *atomizer) sendLog(log string) {
 
 // Initialize the go routines that will read from the conductors concurrently while other parts of the
 // atomizer reads in the inputs and executes the instances of electrons
-func (mizer *atomizer) receive() (err error) {
+func (mizer *atomizer) receive(externalRegistations <-chan interface{}) {
+
+	// Close the registrations channel
+	defer close(mizer.registrations)
+
+	// Cancel out the atomizer in the event of a panic at the receiver because
+	// this cannot be effectively restarted without creating an 	 state
+	defer mizer.cancel()
+
+	// Initialize the registrations channel if it's nil
+	if mizer.registrations == nil {
+		mizer.registrations = make(chan interface{})
+	}
 
 	// Validate the mizer instance
 	if validator.IsValid(mizer) {
 
-		// Range over the sources and setup
-		conductors.Range(func(key, value interface{}) bool {
-			var ok bool
-
+		for {
 			select {
-			case <-mizer.ctx.Done(): // Do nothing so that the loop breaks immediately
-			default:
+			case <-mizer.ctx.Done():
+				break
 
-				if conductor, ok := value.(interfaces.Conductor); ok {
+			// Handle the external-registrations
+			case registration := <-externalRegistations:
+				if err := mizer.register(registration); err != nil {
+					mizer.sendErr(err)
+				}
 
-					if ok, err = mizer.receiveConductor(conductor); ok {
-
-						// Remove the conductor from the map when it's been properly initialized
-						conductors.Delete(key)
+			// Handle the real-time registrations
+			case registration, ok := <-mizer.registrations:
+				if ok {
+					if err := mizer.register(registration); err != nil {
+						mizer.sendErr(err)
 					}
 				} else {
-					err = errors.Errorf("invalid conductor for name [%v]", key)
+					// channel closed
+					panic("unexpected closing of the registrations channel in the atomizer")
 				}
 			}
-
-			return ok
-		})
+		}
 	} else {
-		err = errors.Errorf("Invalid mizer [%v]", mizer)
+		panic("invalid atomizer object")
+	}
+}
+
+// register the differnt receivable interfaces into the atomizer from wherever they were sent from
+func (mizer *atomizer) register(registration interface{}) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("panic in register, unable to register [%v]; [%s]", reflect.TypeOf(registration), r)
+		}
+	}()
+
+	if validator.IsValid(mizer) {
+
+		if validator.IsValid(registration) {
+
+			// Switch over the registration type
+			switch v := registration.(type) {
+			case interfaces.Conductor:
+				err = mizer.receiveConductor(v)
+			case interfaces.Atom:
+				if _, exists := mizer.atoms.LoadOrStore(v.ID(), v); exists {
+					err = errors.New("atom [%v] already registered with the atomizer")
+				}
+			}
+		} else {
+			err = errors.Errorf("invalid [%v] passed to regsiter", reflect.TypeOf(registration))
+		}
+	} else {
+		err = errors.New("invalid atomzier")
 	}
 
 	return err
 }
 
 // recieveConductor setups a retrieval loop for the conductor being passed in
-func (mizer *atomizer) receiveConductor(conductor interfaces.Conductor) (ok bool, err error) {
+func (mizer *atomizer) receiveConductor(conductor interfaces.Conductor) (err error) {
 	if validator.IsValid(mizer) {
 
 		// Ensure this is a valid conductor
-		if ok = validator.IsValid(conductor); ok {
+		if ok := validator.IsValid(conductor); ok {
 
 			// Create the source context with a cancellation option and store the cancellation in a sync map
 			ctx, ctxFunc := context.WithCancel(mizer.ctx)
@@ -108,7 +155,6 @@ func (mizer *atomizer) receiveConductor(conductor interfaces.Conductor) (ok bool
 
 				// Push off the reading into it's own go routine so that it's concurrent
 				mizer.distribute(ctx, conductor, electrons)
-				ok = true
 			} else {
 				err = errors.Errorf("invalid electron channel for conductor [%v]", conductor.ID())
 			}
@@ -121,7 +167,7 @@ func (mizer *atomizer) receiveConductor(conductor interfaces.Conductor) (ok bool
 		err = errors.New("invalid atomizer")
 	}
 
-	return ok, err
+	return err
 }
 
 // Reading in from a specific electron channel of a conductor and drop it onto the atomizer channel for electrons
@@ -133,7 +179,7 @@ func (mizer *atomizer) distribute(ctx context.Context, conductor interfaces.Cond
 					mizer.sendLog(fmt.Sprintf("panic in distribute [%v] for conductor [%v]; pushing conductor back to atomizer", r, conductor.ID()))
 
 					// Self Heal - Replace the conductor onto the map for the atomizer to re-initialize so this stack can be garbage collected
-					err = mizer.AddConductor(conductor)
+					err = mizer.Register(conductor)
 
 				} else {
 					// clean up the cancel method for mizer conductor and close the context
@@ -345,7 +391,7 @@ func (mizer *atomizer) getAtom(id string) (interfaces.Atom, error) {
 	if validator.IsValid(mizer) {
 
 		// Load the atom from the sync.Map
-		if a, ok := atoms.Load(id); ok {
+		if a, ok := mizer.atoms.Load(id); ok {
 
 			// Ensure the value that was registered wasn't stored nil
 			if validator.IsValid(a) {
@@ -371,39 +417,6 @@ func (mizer *atomizer) getAtom(id string) (interfaces.Atom, error) {
 	}
 
 	return atom, err
-}
-
-// Load a conductor from the sync map by key
-func (mizer *atomizer) getConductor(key interface{}) (conductor interfaces.Conductor, err error) {
-	if validator.IsValid(mizer) {
-
-		// Ensure that a proper key has been passed
-		if validator.IsValid(key) {
-
-			// Load the conductor from the sync map
-			if cond, ok := conductors.Load(key); ok {
-
-				// Type assert the conductor
-				if conductor, ok = cond.(interfaces.Conductor); ok {
-
-					// Run the conductor through validation checks
-					if !validator.IsValid(conductor) {
-						err = errors.Errorf("invalid entry in conductors sync.Map for key [%v]", key)
-					}
-				} else {
-					err = errors.Errorf("unable to type assert value to conductor for key [%v]", key)
-				}
-			} else {
-				err = errors.Errorf("conductor is not registered in sync.Map for key [%v]", key)
-			}
-		} else {
-			err = errors.Errorf("key [%v] for conductors sync.Map is invalid", key)
-		}
-	} else {
-		err = errors.New("invalid atomizer")
-	}
-
-	return conductor, err
 }
 
 // TODO: determine if this is still necessary

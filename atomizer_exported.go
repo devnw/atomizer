@@ -4,12 +4,20 @@ import (
 	"context"
 
 	"github.com/benji-vesterby/atomizer/interfaces"
+	"github.com/benji-vesterby/atomizer/registration"
 	"github.com/benji-vesterby/validator"
 	"github.com/pkg/errors"
 )
 
 // Atomize initialize instance of the atomizer to start reading from conductors and execute bonded electrons/atoms
 func Atomize(ctx context.Context) (interfaces.Atomizer, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// TODO:
+			// err = errors.Errorf("panic in register, unable to register [%v]; [%s]", reflect.TypeOf(registration), r)
+		}
+	}()
+
 	var mizer *atomizer
 	var err error
 
@@ -23,47 +31,34 @@ func Atomize(ctx context.Context) (interfaces.Atomizer, error) {
 
 	// Initialize the atomizer and establish the channels
 	mizer = &atomizer{
-		electrons: make(chan ewrappers),
-		instances: make(chan instance),
-		ctx:       ctx,
-		cancel:    cancel,
+		electrons:     make(chan ewrappers),
+		instances:     make(chan instance),
+		registrations: make(chan interface{}),
+		ctx:           ctx,
+		cancel:        cancel,
 	}
+
+	// Start up the receivers
+	go mizer.receive(registration.Registrations(ctx))
 
 	// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
 
-	// Start up the receivers
-	if err = mizer.receive(); err == nil {
-
-		// Initialize the bonding of electrons and atoms
-		go mizer.bond()
-	}
+	// Initialize the bonding of electrons and atoms
+	go mizer.bond()
 
 	return mizer, err
 }
 
-// AddConductor allows you to add additional conductors to be received from after the atomizer has been created
-func (mizer *atomizer) AddConductor(conductor interfaces.Conductor) (err error) {
+// Register allows you to add additional type registrations to the atomizer (ie. Conductors and Atoms)
+func (mizer *atomizer) Register(value interface{}) (err error) {
 
 	// validate the automizer initialization itself
 	if validator.IsValid(mizer) {
 
-		// Determine if the conductor is valid
-		if validator.IsValid(conductor) {
-
-			// Register the source in the sync map for the conductors
-			if err = RegisterSource(conductor); err == nil {
-
-				if _, err = mizer.receiveConductor(conductor); err != nil {
-					err = errors.Errorf("error while receiving conductor [%s] : [%s]", conductor.ID(), err.Error())
-				}
-			} else {
-				err = errors.Errorf("error while registering conductor [%s] : [%s]", conductor.ID(), err.Error())
-			}
-		} else {
-			err = errors.Errorf("error while registering conductor. conductor is invalid.")
-		}
+		// Pass the value on the registrations channel to be recieved
+		mizer.registrations <- value
 	} else {
-		err = errors.New("invalid atomizer")
+		err = errors.New("invalid object to register")
 	}
 
 	return err
