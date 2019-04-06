@@ -2,7 +2,6 @@ package atomizer
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/pkg/errors"
 
@@ -50,19 +49,6 @@ func cancel(c context.CancelFunc) (err error) {
 		c()
 	} else {
 		err = errors.New("cancel function is nil")
-	}
-
-	return err
-}
-
-func nuke(obj interface{}) (err error) {
-
-	if c, ok := obj.(cancelable); ok {
-		// Cancel the object
-		err = c.Cancel()
-
-	} else {
-		err = errors.Errorf("unable to nuke [%v], invalid cancelable obj", reflect.TypeOf(obj))
 	}
 
 	return err

@@ -2,6 +2,7 @@ package atomizer
 
 import (
 	"context"
+	"sync"
 
 	"github.com/benji-vesterby/atomizer/interfaces"
 	"github.com/benji-vesterby/atomizer/registration"
@@ -34,6 +35,8 @@ func Atomize(ctx context.Context) (interfaces.Atomizer, error) {
 		electrons:     make(chan ewrappers),
 		instances:     make(chan instance),
 		registrations: make(chan interface{}),
+		atomFanOut:    make(map[string]chan<- ewrappers),
+		atomFanOutMut: sync.RWMutex{},
 		ctx:           ctx,
 		cancel:        cancel,
 	}

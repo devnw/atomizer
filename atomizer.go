@@ -35,7 +35,8 @@ type atomizer struct {
 
 	// This sync.Map contains the channels for handling each of the bondings for the
 	// different atoms registered in the system
-	atomFanOut sync.Map
+	atomFanOut    map[string]chan<- ewrappers
+	atomFanOutMut sync.RWMutex
 
 	errors     chan error
 	logs       chan string
@@ -162,26 +163,6 @@ func (mizer *atomizer) receiveConductor(conductor interfaces.Conductor) (err err
 	return err
 }
 
-// recieveConductor setups a retrieval loop for the conductor being passed in
-func (mizer *atomizer) receiveAtom(atom interfaces.Atom) (err error) {
-	if validator.IsValid(mizer) {
-
-		// Ensure this is a valid conductor
-		if ok := validator.IsValid(atom); ok {
-
-			// setup atom reciever
-
-		} else {
-			err = errors.Errorf("invalid conductor [%v] set to be received", atom.ID())
-		}
-
-	} else {
-		err = errors.New("invalid atomizer")
-	}
-
-	return err
-}
-
 // Reading in from a specific electron channel of a conductor and drop it onto the atomizer channel for electrons
 func (mizer *atomizer) conduct(ctx context.Context, conductor interfaces.Conductor) (err error) {
 	if validator.IsValid(mizer) {
@@ -225,6 +206,91 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor interfaces.Conduct
 	return err
 }
 
+// recieveConductor setups a retrieval loop for the conductor being passed in
+func (mizer *atomizer) receiveAtom(atom interfaces.Atom) (err error) {
+	if validator.IsValid(mizer) {
+
+		// Ensure this is a valid conductor
+		if ok := validator.IsValid(atom); ok {
+
+			var electrons chan<- ewrappers
+			// setup atom reciever
+			if electrons, err = mizer.split(mizer.ctx, atom); err == nil {
+
+				if electrons != nil {
+
+					// Register the atom into the atomizer for receiving electrons
+					mizer.atomFanOutMut.Lock()
+					mizer.atomFanOut[atom.ID()] = electrons
+					mizer.atomFanOutMut.Unlock()
+				} else {
+					// TODO: Error
+				}
+			} else {
+				// TODO:
+			}
+		} else {
+			err = errors.Errorf("invalid conductor [%v] set to be received", atom.ID())
+		}
+
+	} else {
+		err = errors.New("invalid atomizer")
+	}
+
+	return err
+}
+
+func (mizer *atomizer) split(ctx context.Context, atom interfaces.Atom) (chan<- ewrappers, error) {
+	electrons := make(chan ewrappers)
+	var err error
+
+	if validator.IsValid(mizer) {
+
+		go func(ctx context.Context, atom interfaces.Atom, electrons <-chan ewrappers) {
+			defer mizer.sendErr(handle(atom, func() {
+
+				// remove the electron channel from the map of atoms so that it can be
+				// properly cleaned up before re-registering
+				mizer.atomFanOutMut.Lock()
+				delete(mizer.atomFanOut, atom.ID())
+				mizer.atomFanOutMut.Unlock()
+
+				// Self Heal - Re-place the atom on the register channel for the atomizer
+				// to re-initialize so this stack can be garbage collected
+				err = mizer.Register(atom)
+			}))
+
+			// Read from the electron channel for mizer conductor and push onto the mizer electron channel for processing
+			for {
+				select {
+				case <-ctx.Done():
+					// Break the loop to close out the receiver
+					mizer.sendErr(errors.Errorf("context closed for atom [%v]; exiting [%s]", atom.ID(), ctx.Err().Error()))
+					break
+				case electron, ok := <-electrons:
+					if ok {
+
+						// Ensure that the electron being received is valid
+						if validator.IsValid(electron) {
+
+							// TODO:
+						} else {
+							mizer.sendErr(errors.Errorf("invalid electron passed to atomizer [%v]", electron))
+						}
+					} else { // Channel is closed, break out of the loop
+						mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", atom.ID()))
+						break
+					}
+				}
+			}
+		}(ctx, atom, electrons)
+	} else {
+		err = errors.New("mizer is invalid")
+	}
+
+	return electrons, err
+}
+
 func (mizer *atomizer) distribute(ctx context.Context) {
 	// TODO: defer
 
@@ -236,16 +302,40 @@ func (mizer *atomizer) distribute(ctx context.Context) {
 	if validator.IsValid(mizer) {
 		for {
 			select {
-			case <- ctx.Done():
-				break // TODO: 
-				case 
+			case <-ctx.Done():
+				break // TODO:
+			case ewrap, ok := <-mizer.electrons:
+				if ok {
+
+					go func() {
+						// TODO: Handle the panic here in the event that the channel is closed and return the electron to the channel
+
+						if validator.IsValid(ewrap) {
+							var atomchan chan<- ewrappers
+
+							mizer.atomFanOutMut.RLock()
+							atomchan = mizer.atomFanOut[ewrap.electron.Atom()]
+							mizer.atomFanOutMut.RUnlock()
+
+							// Pass the electron to the correct atom channel if it is not nil
+							if atomchan != nil {
+								atomchan <- ewrap
+							} else {
+								// TODO:
+							}
+						} else {
+							// TODO:
+						}
+					}()
+				} else {
+					// TODO: panic here because atomizer can't work without electron distribution
+					break
+				}
 			}
 		}
 	} else {
 		// TODO:
 	}
-
-	return electrons
 }
 
 // Combine an electron and an atom and initiate the processing of the atom in it's own go routine
