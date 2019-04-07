@@ -8,12 +8,12 @@ import (
 	"github.com/benji-vesterby/atomizer/interfaces"
 )
 
-type ewrappers struct {
-	electron  interfaces.Electron
-	conductor interfaces.Conductor
-	// ctx       context.Context
-	// cancel    context.CancelFunc
-}
+// type ewrappers struct {
+// 	electron  interfaces.Electron
+// 	conductor interfaces.Conductor
+// 	// ctx       context.Context
+// 	// cancel    context.CancelFunc
+// }
 
 // func (w *ewrappers) Cancel() (err error) {
 // 	return cancel(w.cancel)

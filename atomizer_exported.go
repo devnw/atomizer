@@ -32,10 +32,10 @@ func Atomize(ctx context.Context) (interfaces.Atomizer, error) {
 
 	// Initialize the atomizer and establish the channels
 	mizer = &atomizer{
-		electrons:     make(chan ewrappers),
-		instances:     make(chan instance),
+		electrons:     make(chan instance),
+		bonded:        make(chan instance),
 		registrations: make(chan interface{}),
-		atomFanOut:    make(map[string]chan<- ewrappers),
+		atomFanOut:    make(map[string]chan<- instance),
 		atomFanOutMut: sync.RWMutex{},
 		ctx:           ctx,
 		cancel:        cancel,
@@ -45,9 +45,6 @@ func Atomize(ctx context.Context) (interfaces.Atomizer, error) {
 	go mizer.receive(registration.Registrations(ctx))
 
 	// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
-
-	// Initialize the bonding of electrons and atoms
-	go mizer.bond()
 
 	return mizer, err
 }
@@ -145,7 +142,7 @@ func (mizer *atomizer) Validate() (valid bool) {
 	if mizer.electrons != nil {
 
 		// Ensure the instances channel to pass out for monitoring is initialized
-		if mizer.instances != nil {
+		if mizer.bonded != nil {
 
 			// Ensure a valid context has been passed to the mizer
 			if mizer.ctx != nil {

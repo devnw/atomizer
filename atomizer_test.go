@@ -165,8 +165,8 @@ func TestAtomizer_Validate(t *testing.T) {
 		{
 			"ValidAtomizerTest",
 			&atomizer{
-				electrons: make(chan ewrappers),
-				instances: make(chan instance),
+				electrons: make(chan instance),
+				bonded:    make(chan instance),
 				ctx:       context.Background(),
 				cancel: context.CancelFunc(func() {
 
@@ -178,7 +178,7 @@ func TestAtomizer_Validate(t *testing.T) {
 			"InvalidAtomizerNilElectrons",
 			&atomizer{
 				electrons: nil,
-				instances: make(chan instance),
+				bonded:    make(chan instance),
 				ctx:       context.Background(),
 				cancel: context.CancelFunc(func() {
 
@@ -189,8 +189,8 @@ func TestAtomizer_Validate(t *testing.T) {
 		{
 			"InvalidAtomizerNilInstances",
 			&atomizer{
-				electrons: make(chan ewrappers),
-				instances: nil,
+				electrons: make(chan instance),
+				bonded:    nil,
 				ctx:       context.Background(),
 				cancel: context.CancelFunc(func() {
 
@@ -201,8 +201,8 @@ func TestAtomizer_Validate(t *testing.T) {
 		{
 			"InvalidAtomizerNilContext",
 			&atomizer{
-				electrons: make(chan ewrappers),
-				instances: make(chan instance),
+				electrons: make(chan instance),
+				bonded:    make(chan instance),
 				ctx:       nil,
 				cancel: context.CancelFunc(func() {
 
@@ -213,8 +213,8 @@ func TestAtomizer_Validate(t *testing.T) {
 		{
 			"InvalidAtomizerNilCancel",
 			&atomizer{
-				electrons: make(chan ewrappers),
-				instances: make(chan instance),
+				electrons: make(chan instance),
+				bonded:    make(chan instance),
 				ctx:       context.Background(),
 				cancel:    nil,
 			},
@@ -260,8 +260,8 @@ func BenchmarkAtomizer_Exit100(b *testing.B) {
 // Benchmarks the validation method of the atomizer
 func BenchmarkAtomizer_Validate(b *testing.B) {
 	var mizer = &atomizer{
-		electrons: make(chan ewrappers),
-		instances: make(chan instance),
+		electrons: make(chan instance),
+		bonded:    make(chan instance),
 		ctx:       context.Background(),
 		cancel: context.CancelFunc(func() {
 
