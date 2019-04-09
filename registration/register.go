@@ -11,39 +11,54 @@ import (
 // preRegistrations of atoms and conductors that are loaded using init
 // by libraries utilizing the atomizer
 var preRegistrations sync.Map
+
+// TODO: Should this be a constant?
 var preRegSingleton = sync.Once{}
 var regchan chan interface{}
+
+// Used to get rid of race conditions for shared resources in registration
+var mutty = sync.RWMutex{}
 
 // Registrations returns a channel which contains the init pre-registrations
 // for use by the atomizer
 func Registrations(ctx context.Context) <-chan interface{} {
 
 	// Initialize the registrations channel
+	mutty.Lock()
 	regchan = make(chan interface{})
+	mutty.Unlock()
 
 	// Execute a singleton instance to read the pre-registations from the sync.Map for init registrations
 	// and push those to a channel for use by the receiver
-	go preRegSingleton.Do(func() {
+	preRegSingleton.Do(func() {
 
-		// Range over the map and pass back through channel
-		preRegistrations.Range(func(key, value interface{}) bool {
-			var ok bool
+		// Push off in go routine so that the channel can be returned immediately
+		go func() {
 
-			select {
-			case <-ctx.Done():
-				close(regchan)
-			default:
+			// Lock the reads and modifications of the pre-registrations to keep from
+			// having race conditions in the registrations
+			mutty.RLock()
+			preRegistrations.Range(func(key, value interface{}) bool {
+				var ok bool
 
-				// Pass the value over the channel
-				regchan <- value
+				select {
+				case <-ctx.Done():
+					close(regchan)
+				default:
 
-				// Delete the key from the map to indicate that it's been received
-				// TODO: Determine if this is the correct functionality here
-				preRegistrations.Delete(key)
-			}
+					// Pass the value over the channel
+					regchan <- value
 
-			return ok
-		})
+					// Delete the key from the map to indicate that it's been received
+					preRegistrations.Delete(key)
+
+					ok = true
+				}
+
+				return ok
+			})
+			mutty.RUnlock()
+		}()
 	})
 
 	return regchan
@@ -88,7 +103,9 @@ func Register(key interface{}, value interface{}) (err error) {
 // this method is primarily for testing and should not be used otherwise
 func Clean() {
 
+	mutty.Lock()
 	preRegistrations = sync.Map{}
 	preRegSingleton = sync.Once{}
 	regchan = nil
+	mutty.Unlock()
 }

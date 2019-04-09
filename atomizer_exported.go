@@ -41,6 +41,7 @@ func Atomize(ctx context.Context) (interfaces.Atomizer, error) {
 		cancel:        cancel,
 	}
 
+	// TODO: Should this be executed in a sync.Once?
 	// Start up the receivers
 	go mizer.receive(registration.Registrations(ctx))
 

@@ -68,7 +68,11 @@ func TestAtomizeNoConductors(t *testing.T) {
 			registration.Register(test.key, test.value)
 		}
 
-		if _, err := Atomize(context.Background()); !test.err && err != nil {
+		if mizer, err := Atomize(context.Background()); !test.err && err == nil {
+			if !validator.IsValid(mizer) {
+				t.Errorf("atomizer was expected to be valid but was returned invalid")
+			}
+		} else if !test.err && err != nil {
 			t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
 		} else if test.err && err == nil {
 			t.Errorf("expected error for test [%s] but received success", test.key)
