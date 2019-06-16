@@ -6,7 +6,6 @@ import (
 
 	"github.com/benji-vesterby/atomizer/registration"
 
-	"github.com/benji-vesterby/atomizer/interfaces"
 	"github.com/benji-vesterby/validator"
 )
 

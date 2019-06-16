@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/benji-vesterby/validator"
-
-	"github.com/benji-vesterby/atomizer/interfaces"
 )
 
 type instance struct {
