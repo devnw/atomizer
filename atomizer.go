@@ -9,14 +9,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Atomizer interface implementation
-type Atomizer interface {
-	Register(value interface{}) error
-	Errors(buffer int) (<-chan error, error)
-	Properties(buffer int) (<-chan Properties, error)
-	Validate() bool
-}
-
 // atomizer facilitates the execution of tasks (aka Electrons) which are received from the configured sources
 // these electrons can be distributed across many instances of the atomizer on different nodes in a distributed
 // system or in memory. Atoms should be created to process "atomic" actions which are small in scope and overall
@@ -47,6 +39,47 @@ type atomizer struct {
 	properties chan Properties
 	ctx        context.Context
 	cancel     context.CancelFunc
+}
+
+func (mizer *atomizer) init() *atomizer {
+
+	// Initialize the context. In the event that the atomizer was initialized with
+	// a context passed into it then use the context to create a new context with a cancel
+	// otherwise create a new context with cancel from a background context
+	if mizer.ctx == nil {
+		mizer.ctx, mizer.cancel = context.WithCancel(context.Background())
+	} else if mizer.cancel == nil {
+		mizer.ctx, mizer.cancel = context.WithCancel(mizer.ctx)
+	}
+
+	select {
+	case <-mizer.ctx.Done():
+		return nil
+	default:
+
+		// Initialize the electrons channel
+		if mizer.electrons == nil {
+			mizer.electrons = make(chan instance)
+		}
+
+		// Initialize the bonded channel
+		if mizer.bonded == nil {
+			mizer.bonded = make(chan instance)
+		}
+
+		// Initialize the registrations channel
+		if mizer.registrations == nil {
+			mizer.registrations = make(chan interface{})
+		}
+
+		// Initialize the atom fan out map and mutex
+		if mizer.atomFanOut == nil {
+			mizer.atomFanOut = make(map[string]chan<- instance)
+			mizer.atomFanOutMut = sync.RWMutex{}
+		}
+	}
+
+	return mizer
 }
 
 // If the error channel is not nil then send the error on the channel

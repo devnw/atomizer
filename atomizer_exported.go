@@ -2,15 +2,22 @@ package atomizer
 
 import (
 	"context"
-	"sync"
-
 	"github.com/benji-vesterby/atomizer/registration"
 	"github.com/benji-vesterby/validator"
 	"github.com/pkg/errors"
 )
 
+// Atomizer interface implementation
+type Atomizer interface {
+	Exec() error
+	Register(value interface{}) error
+	Errors(buffer int) (<-chan error, error)
+	Properties(buffer int) (<-chan Properties, error)
+	Validate() bool
+}
+
 // Atomize initialize instance of the atomizer to start reading from conductors and execute bonded electrons/atoms
-func Atomize(ctx context.Context) (Atomizer, error) {
+func Atomize(ctx context.Context) Atomizer {
 	defer func() {
 		if r := recover(); r != nil {
 			// TODO:
@@ -18,29 +25,7 @@ func Atomize(ctx context.Context) (Atomizer, error) {
 		}
 	}()
 
-	var mizer *atomizer
-	var err error
-
-	// If a nil context was passed then create a background context to be used instead
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithCancel(ctx)
-
-	// Initialize the atomizer and establish the channels
-	mizer = &atomizer{
-		electrons:     make(chan instance),
-		bonded:        make(chan instance),
-		registrations: make(chan interface{}),
-		atomFanOut:    make(map[string]chan<- instance),
-		atomFanOutMut: sync.RWMutex{},
-		ctx:           ctx,
-		cancel:        cancel,
-	}
-
-	return mizer, err
+	return (&atomizer{ctx: ctx}).init()
 }
 
 // Exec kicks off the processing of the atmoizer by pulling in the pre-registrations through init calls
@@ -126,17 +111,7 @@ func (mizer *atomizer) Errors(buffer int) (<-chan error, error) {
 // Validate verifies that this instance of the atomizer is correctly initialized. This imports the validator library
 // for extended use with the Validate method
 func (mizer *atomizer) Validate() (valid bool) {
-
-	// Ensure a proper initialization of the atomizer
-	if mizer.electrons != nil &&
-		mizer.bonded != nil &&
-		mizer.registrations != nil &&
-		mizer.atomFanOut != nil &&
-		mizer.ctx != nil &&
-		mizer.cancel != nil {
-
-		valid = true
-	}
+	valid = mizer.init() != nil
 
 	return valid
 }

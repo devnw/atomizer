@@ -67,7 +67,8 @@ func TestAtomizeNoConductors(t *testing.T) {
 			registration.Register(test.key, test.value)
 		}
 
-		if mizer, err := Atomize(context.Background()); !test.err && err == nil {
+		mizer := Atomize(context.Background())
+		if err := mizer.Exec(); test.err && err == nil {
 			if !validator.IsValid(mizer) {
 				t.Errorf("atomizer was expected to be valid but was returned invalid")
 			}
@@ -125,7 +126,8 @@ func TestAtomizer_AddConductor(t *testing.T) {
 		registration.Clean()
 
 		// Create an instance of the atomizer to test the add conductor with
-		if mizer, err := Atomize(context.Background()); err == nil {
+		mizer := Atomize(context.Background())
+		if err := mizer.Exec(); err == nil {
 
 			if validator.IsValid(mizer) {
 
