@@ -5,10 +5,17 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/benji-vesterby/atomizer/interfaces"
 	"github.com/benji-vesterby/validator"
 	"github.com/pkg/errors"
 )
+
+// Atomizer interface implementation
+type Atomizer interface {
+	Register(value interface{}) error
+	Errors(buffer int) (<-chan error, error)
+	Properties(buffer int) (<-chan Properties, error)
+	Validate() bool
+}
 
 // atomizer facilitates the execution of tasks (aka Electrons) which are received from the configured sources
 // these electrons can be distributed across many instances of the atomizer on different nodes in a distributed
@@ -29,7 +36,7 @@ type atomizer struct {
 
 	// This is the communication channel for the atoms being read into the system
 	// and is used to create atom workers for bonding purposes
-	atoms chan interfaces.Atom
+	atoms chan Atom
 
 	// This sync.Map contains the channels for handling each of the bondings for the
 	// different atoms registered in the system
@@ -37,8 +44,7 @@ type atomizer struct {
 	atomFanOutMut sync.RWMutex
 
 	errors     chan error
-	logs       chan string
-	properties chan interfaces.Properties
+	properties chan Properties
 	ctx        context.Context
 	cancel     context.CancelFunc
 }
@@ -48,15 +54,6 @@ func (mizer *atomizer) sendErr(err error) {
 	if validator.IsValid(mizer) {
 		if mizer.errors != nil {
 			mizer.errors <- err
-		}
-	}
-}
-
-// if the log channel is not nil then send the log on the channel
-func (mizer *atomizer) sendLog(log string) {
-	if validator.IsValid(mizer) {
-		if mizer.logs != nil {
-			mizer.logs <- log
 		}
 	}
 }
@@ -124,9 +121,9 @@ func (mizer *atomizer) register(registration interface{}) (err error) {
 
 			// Switch over the registration type
 			switch v := registration.(type) {
-			case interfaces.Conductor:
+			case Conductor:
 				err = mizer.receiveConductor(v)
-			case interfaces.Atom:
+			case Atom:
 				err = mizer.receiveAtom(v)
 			default:
 				// TODO: error here because the type is unknown
@@ -142,7 +139,7 @@ func (mizer *atomizer) register(registration interface{}) (err error) {
 }
 
 // recieveConductor setups a retrieval loop for the conductor being passed in
-func (mizer *atomizer) receiveConductor(conductor interfaces.Conductor) (err error) {
+func (mizer *atomizer) receiveConductor(conductor Conductor) (err error) {
 	if validator.IsValid(mizer) {
 
 		// Ensure this is a valid conductor
@@ -166,9 +163,9 @@ func (mizer *atomizer) receiveConductor(conductor interfaces.Conductor) (err err
 }
 
 // Reading in from a specific electron channel of a conductor and drop it onto the atomizer channel for electrons
-func (mizer *atomizer) conduct(ctx context.Context, conductor interfaces.Conductor) (err error) {
+func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) (err error) {
 	if validator.IsValid(mizer) {
-		go func(ctx context.Context, conductor interfaces.Conductor) {
+		go func(ctx context.Context, conductor Conductor) {
 			defer mizer.sendErr(handle(conductor, func() {
 
 				// Self Heal - Re-place the conductor on the register channel for the atomizer
@@ -209,7 +206,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor interfaces.Conduct
 }
 
 // recieveConductor setups a retrieval loop for the conductor being passed in
-func (mizer *atomizer) receiveAtom(atom interfaces.Atom) (err error) {
+func (mizer *atomizer) receiveAtom(atom Atom) (err error) {
 	if validator.IsValid(mizer) {
 
 		// Ensure this is a valid conductor
@@ -242,13 +239,13 @@ func (mizer *atomizer) receiveAtom(atom interfaces.Atom) (err error) {
 	return err
 }
 
-func (mizer *atomizer) split(ctx context.Context, atom interfaces.Atom) (chan<- instance, error) {
+func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, error) {
 	electrons := make(chan instance)
 	var err error
 
 	if validator.IsValid(mizer) {
 
-		go func(ctx context.Context, atom interfaces.Atom, electrons <-chan instance) {
+		go func(ctx context.Context, atom Atom, electrons <-chan instance) {
 			defer mizer.sendErr(handle(atom, func() {
 
 				// remove the electron channel from the map of atoms so that it can be
@@ -278,13 +275,13 @@ func (mizer *atomizer) split(ctx context.Context, atom interfaces.Atom) (chan<- 
 						// individually bonded instances
 
 						// Initialize a new copy of the atom
-						newAtom := reflect.New(reflect.TypeOf(atom))
+						newAtom := reflect.New(reflect.TypeOf(atom).Elem())
 
 						// Type assert the new copy of the atom to an atom so that it can be used for processing
 						// and returned as a pointer for bonding
 						// the := is on purpose here to hide the original instance of the atom so that it's not
 						// being accidentally used in this section
-						if atom, ok := newAtom.Interface().(interfaces.Atom); ok {
+						if atom, ok := newAtom.Interface().(Atom); ok {
 							if validator.IsValid(atom) {
 
 								// bond the new atom instantiation to the electron instance

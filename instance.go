@@ -10,16 +10,16 @@ import (
 )
 
 type instance struct {
-	electron   interfaces.Electron
-	conductor  interfaces.Conductor
-	atom       interfaces.Atom
+	electron   Electron
+	conductor  Conductor
+	atom       Atom
 	properties *properties
 	cancel     context.CancelFunc
 
 	// TODO: add an actions channel here that the monitor can keep an eye on for this bonded electron/atom combo
 }
 
-func (inst *instance) bond(atom interfaces.Atom) (err error) {
+func (inst *instance) bond(atom Atom) (err error) {
 
 	if validator.IsValid(inst.electron) {
 
@@ -114,7 +114,7 @@ func (inst *instance) execute(ctx context.Context) {
 	}
 }
 
-func (inst *instance) Properties() interfaces.Properties {
+func (inst *instance) Properties() Properties {
 	return inst.properties
 }
 

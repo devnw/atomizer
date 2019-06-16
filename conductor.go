@@ -1,4 +1,4 @@
-package interfaces
+package atomizer
 
 // Conductor is the interface that should be implemented for passing electrons to the atomizer
 // that need processing. This should generally be registered with the atomizer in an initialization script
@@ -8,13 +8,13 @@ type Conductor interface {
 	ID() string
 
 	// Receive gets the atoms from the source that are available to atomize
-	Receive() <-chan Electron
+	Receive() <-chan atomizer.Electron
 
 	// Complete mark the completion of an electron instance with applicable statistics
 	Complete(properties Properties)
 
 	// Send sends electrons back out through the conductor for additional processing
-	Send(electron Electron) (result <-chan []byte)
+	Send(electron atomizer.Electron) (result <-chan []byte)
 
 	// Validate ensure the conductor is valid
 	Validate() (valid bool)

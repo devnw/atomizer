@@ -2,9 +2,9 @@ package registration
 
 import (
 	"context"
+	"github.com/benji-vesterby/atomizer"
 	"testing"
 
-	"github.com/benji-vesterby/atomizer/interfaces"
 	"github.com/benji-vesterby/validator"
 )
 
@@ -16,7 +16,7 @@ func (atomteststr *atomTestStruct) Validate() (valid bool) {
 	return atomteststr != nil
 }
 
-func (atomteststr *atomTestStruct) Process(ctx context.Context, electron interfaces.Electron, outbound chan<- interfaces.Electron) (result <-chan []byte, err <-chan error) {
+func (atomteststr *atomTestStruct) Process(ctx context.Context, electron atomizer.Electron, outbound chan<- atomizer.Electron) (result <-chan []byte, err <-chan error) {
 	return result, err
 }
 
@@ -63,7 +63,7 @@ func TestRegister(t *testing.T) {
 	for _, test := range tests {
 		if err := Register(test.key, test.value); err == nil {
 			if value, ok := preRegistrations.Load(test.key); ok {
-				if atomValue, ok := value.(interfaces.Atom); ok {
+				if atomValue, ok := value.(atomizer.Atom); ok {
 					if !validator.IsValid(atomValue) {
 						t.Errorf("Test key [%s] failed because the returned value was invalid", test.key)
 					}

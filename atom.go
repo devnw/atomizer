@@ -1,6 +1,8 @@
-package interfaces
+package atomizer
 
-import "context"
+import (
+	"context"
+)
 
 // Atom is an atomic action with process method for the atomizer to execute the Atom
 type Atom interface {

@@ -4,13 +4,11 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-
-	"github.com/benji-vesterby/atomizer/interfaces"
 )
 
 // type ewrappers struct {
-// 	electron  interfaces.Electron
-// 	conductor interfaces.Conductor
+// 	electron  Electron
+// 	conductor Conductor
 // 	// ctx       context.Context
 // 	// cancel    context.CancelFunc
 // }
@@ -20,7 +18,7 @@ import (
 // }
 
 type cwrapper struct {
-	interfaces.Conductor
+	Conductor
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -30,7 +28,7 @@ func (w *cwrapper) Cancel() (err error) {
 }
 
 type awrapper struct {
-	interfaces.Atom
+	Atom
 	ctx    context.Context
 	cancel context.CancelFunc
 }
