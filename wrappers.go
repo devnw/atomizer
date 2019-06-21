@@ -24,7 +24,7 @@ type cwrapper struct {
 }
 
 func (w *cwrapper) Cancel() (err error) {
-	return cancel(w.cancel)
+	return wrapcancel(w.cancel)
 }
 
 type awrapper struct {
@@ -34,14 +34,14 @@ type awrapper struct {
 }
 
 func (w *awrapper) Cancel() (err error) {
-	return cancel(w.cancel)
+	return wrapcancel(w.cancel)
 }
 
 type cancelable interface {
 	Cancel() error
 }
 
-func cancel(c context.CancelFunc) (err error) {
+func wrapcancel(c context.CancelFunc) (err error) {
 
 	if c != nil {
 		c()

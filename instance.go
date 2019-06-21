@@ -117,7 +117,7 @@ func (inst *instance) Properties() Properties {
 }
 
 func (inst *instance) Cancel() (err error) {
-	return cancel(inst.cancel)
+	return wrapcancel(inst.cancel)
 }
 
 func (inst *instance) Validate() (valid bool) {

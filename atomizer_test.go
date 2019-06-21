@@ -3,6 +3,7 @@ package atomizer
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/benji-vesterby/atomizer/registration"
 
@@ -20,7 +21,7 @@ type validcondcutor struct {
 func (cond *validcondcutor) ID() string                                    { return cond.id }
 func (cond *validcondcutor) Receive() <-chan Electron                      { return cond.echan }
 func (cond *validcondcutor) Send(electron Electron) (result <-chan []byte) { return nil }
-func (cond *validcondcutor) Validate() (valid bool)                        { return cond.valid }
+func (cond *validcondcutor) Validate() (valid bool)                        { return cond.valid && cond.echan != nil }
 func (cond *validcondcutor) Complete(properties Properties)                {}
 
 // Tests the atomizer creation method without a conductor
@@ -125,24 +126,44 @@ func TestAtomizer_AddConductor(t *testing.T) {
 		// Reset sync map for this test
 		registration.Clean()
 
-		// Create an instance of the atomizer to test the add conductor with
-		mizer := Atomize(context.Background())
-		if err := mizer.Exec(); err == nil {
+		func() {
+			var ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
 
-			if validator.IsValid(mizer) {
+			// Create an instance of the atomizer to test the add conductor with
+			mizer := Atomize(ctx)
+			if errs, err := mizer.Errors(0); err == nil {
+				if err = mizer.Exec(); err == nil {
 
-				// Add the conductor
-				if err = registration.Register(test.key, test.value); !test.err && err != nil {
-					t.Errorf("expected success for test [%s] but received error while adding atomizer [%s]", test.key, err)
-				} else if test.err && err == nil {
-					t.Errorf("expected error for test [%s] but received success", test.key)
+					if validator.IsValid(mizer) {
+
+						// Add the conductor
+						if err = registration.Register(test.key, test.value); err == nil {
+
+							select {
+							case <-ctx.Done():
+								// context for the atomizer was cancelled
+							case aerr, ok := <-errs:
+								if ok && aerr == nil && test.err {
+									t.Errorf("expected error for test [%s] but received success", test.key)
+								} else if ok && aerr != nil && !test.err {
+									t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
+								}
+							}
+						} else {
+							// TODO:
+							t.Errorf("expected error for test [%s] but received success", test.key)
+						}
+					} else {
+						t.Errorf("expected the atomizer to be valid but it was invalid for ALL tests")
+					}
+				} else {
+					t.Errorf("expected successful atomizer creation for test [%s] but received error while initializing atomizer [%s]", test.key, err.Error())
 				}
 			} else {
-				// TODO:
+				t.Errorf("error while getting the errors channel from the atomizer")
 			}
-		} else {
-			t.Errorf("expected successful atomizer creation for test [%s] but received error while initializing atomizer [%s]", test.key, err.Error())
-		}
+		}()
 
 		// Cleanup sync map for additional tests
 		registration.Clean()

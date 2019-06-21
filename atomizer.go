@@ -86,7 +86,16 @@ func (mizer *atomizer) init() *atomizer {
 func (mizer *atomizer) sendErr(err error) {
 	if validator.IsValid(mizer) {
 		if mizer.errors != nil {
-			mizer.errors <- err
+			select {
+			case <-mizer.ctx.Done():
+
+				// Close the errors channel and return the context error to the requester
+				close(mizer.errors)
+				err = mizer.ctx.Err()
+
+			case mizer.errors <- err:
+				// Sent the error on the channel
+			}
 		}
 	}
 }
@@ -115,7 +124,7 @@ func (mizer *atomizer) receive(externalRegistations <-chan interface{}) {
 		for {
 			select {
 			case <-mizer.ctx.Done():
-				break
+				return
 
 			// Handle the external-registrations
 			case registration := <-externalRegistations:
@@ -212,7 +221,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) (err er
 				case <-ctx.Done():
 					// Break the loop to close out the receiver
 					mizer.sendErr(errors.Errorf("context closed for distribution of conductor [%v]; exiting [%s]", conductor.ID(), ctx.Err().Error()))
-					break
+					return
 				case electron, ok := <-conductor.Receive():
 					if ok {
 
@@ -226,7 +235,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) (err er
 						}
 					} else { // Channel is closed, break out of the loop
 						mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", conductor.ID()))
-						break
+						return
 					}
 				}
 			}
@@ -298,7 +307,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 				case <-ctx.Done():
 					// Break the loop to close out the receiver
 					mizer.sendErr(errors.Errorf("context closed for atom [%v]; exiting [%s]", atom.ID(), ctx.Err().Error()))
-					break
+					return
 				case inst, ok := <-electrons:
 					if ok {
 
@@ -333,7 +342,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 						}
 					} else { // Channel is closed, break out of the loop
 						mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", atom.ID()))
-						break
+						return
 					}
 				}
 			}
@@ -357,7 +366,7 @@ func (mizer *atomizer) distribute(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				break // TODO:
+				return
 			case ewrap, ok := <-mizer.electrons:
 				if ok {
 
@@ -384,7 +393,7 @@ func (mizer *atomizer) distribute(ctx context.Context) {
 					}()
 				} else {
 					// TODO: panic here because atomizer can't work without electron distribution
-					break
+					return
 				}
 			}
 		}
