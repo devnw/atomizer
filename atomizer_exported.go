@@ -2,6 +2,7 @@ package atomizer
 
 import (
 	"context"
+
 	"github.com/benji-vesterby/atomizer/registration"
 	"github.com/benji-vesterby/validator"
 	"github.com/pkg/errors"
@@ -28,7 +29,7 @@ func Atomize(ctx context.Context) Atomizer {
 	return (&atomizer{ctx: ctx}).init()
 }
 
-// Exec kicks off the processing of the atmoizer by pulling in the pre-registrations through init calls
+// Exec kicks off the processing of the atomizer by pulling in the pre-registrations through init calls
 // on imported libraries and starts up the receivers for atoms and conductors
 func (mizer *atomizer) Exec() (err error) {
 
