@@ -1,6 +1,9 @@
 # Removing Vendor
 vendor/
 
+# Removing .json files which will be used for configs
+*.json
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
