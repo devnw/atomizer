@@ -3,15 +3,18 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/benji-vesterby/atomizer"
+  packages = [
+    ".",
+    "registration"
+  ]
+  revision = "7e11bf9c14c46adcf8805b930a28dd50b4a62fd9"
+
+[[projects]]
+  branch = "master"
   name = "github.com/benji-vesterby/validator"
   packages = ["."]
   revision = "56f94887ae25c2fff3bbde194638587d9018c164"
-
-[[projects]]
-  name = "github.com/gofrs/uuid"
-  packages = ["."]
-  revision = "6b08a5c5172ba18946672b49749cde22873dd7c2"
-  version = "v3.2.0"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -22,6 +25,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "980c86bfc1a827088d7d2996801993dddbb2e3473d3413756b8d486ce9fe184d"
+  inputs-digest = "a6aaa70e5e24045eac563d075fcde6b58cbb59e4f3a62fd3fb1204463ae38efd"
   solver-name = "gps-cdcl"
   solver-version = 1

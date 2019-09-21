@@ -150,9 +150,8 @@ func TestAtomizer_AddConductor(t *testing.T) {
 									t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
 								}
 							}
-						} else {
-							// TODO:
-							t.Errorf("expected error for test [%s] but received success", test.key)
+						} else if !test.err {
+							t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
 						}
 					} else {
 						t.Errorf("expected the atomizer to be valid but it was invalid for ALL tests")
@@ -203,52 +202,6 @@ func TestAtomizer_Validate(t *testing.T) {
 				}),
 			},
 			false,
-		},
-		{
-			"InvalidAtomizerNilElectrons",
-			&atomizer{
-				electrons: nil,
-				bonded:    make(chan instance),
-				ctx:       context.Background(),
-				cancel: context.CancelFunc(func() {
-
-				}),
-			},
-			true,
-		},
-		{
-			"InvalidAtomizerNilInstances",
-			&atomizer{
-				electrons: make(chan instance),
-				bonded:    nil,
-				ctx:       context.Background(),
-				cancel: context.CancelFunc(func() {
-
-				}),
-			},
-			true,
-		},
-		{
-			"InvalidAtomizerNilContext",
-			&atomizer{
-				electrons: make(chan instance),
-				bonded:    make(chan instance),
-				ctx:       nil,
-				cancel: context.CancelFunc(func() {
-
-				}),
-			},
-			true,
-		},
-		{
-			"InvalidAtomizerNilCancel",
-			&atomizer{
-				electrons: make(chan instance),
-				bonded:    make(chan instance),
-				ctx:       context.Background(),
-				cancel:    nil,
-			},
-			true,
 		},
 		{
 			"InvalidAtomizerNilAtomizer",
