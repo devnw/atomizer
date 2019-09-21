@@ -35,11 +35,14 @@ func (mizer *atomizer) Exec() (err error) {
 
 	if validator.IsValid(mizer) {
 
-		// TODO: Should this be executed in a sync.Once?
-		// Start up the receivers
-		go mizer.receive(registration.Registrations(mizer.ctx))
+		// Execute on the atomizer should only ever be run once
+		mizer.execSyncOnce.Do(func() {
 
-		// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
+			// Start up the receivers
+			err = mizer.receive(registration.Registrations(mizer.ctx))
+
+			// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
+		})
 	} else {
 		// TODO:
 	}

@@ -39,6 +39,8 @@ type atomizer struct {
 	properties chan Properties
 	ctx        context.Context
 	cancel     context.CancelFunc
+
+	execSyncOnce sync.Once
 }
 
 func (mizer *atomizer) init() *atomizer {
@@ -102,17 +104,7 @@ func (mizer *atomizer) sendErr(err error) {
 
 // Initialize the go routines that will read from the conductors concurrently while other parts of the
 // atomizer reads in the inputs and executes the instances of electrons
-func (mizer *atomizer) receive(externalRegistations <-chan interface{}) {
-	// TODO: handle panics and re-init
-	// TODO: Self-heal with heartbeats
-
-	// Close the registrations channel
-	defer close(mizer.registrations)
-
-	// Cancel out the atomizer in the event of a panic at the receiver because
-	// this cannot be effectively restarted without creating an 	 state
-	defer mizer.cancel()
-
+func (mizer *atomizer) receive(externalRegistations <-chan interface{}) (err error) {
 	// Initialize the registrations channel if it's nil
 	if mizer.registrations == nil {
 		mizer.registrations = make(chan interface{})
@@ -121,32 +113,46 @@ func (mizer *atomizer) receive(externalRegistations <-chan interface{}) {
 	// Validate the mizer instance
 	if validator.IsValid(mizer) {
 
-		for {
-			select {
-			case <-mizer.ctx.Done():
-				return
+		go func() {
+			// TODO: handle panics and re-init
+			// TODO: Self-heal with heartbeats
 
-			// Handle the external-registrations
-			case registration := <-externalRegistations:
-				if err := mizer.register(registration); err != nil {
-					mizer.sendErr(err)
-				}
+			// Close the registrations channel
+			defer close(mizer.registrations)
 
-			// Handle the real-time registrations
-			case registration, ok := <-mizer.registrations:
-				if ok {
+			// Cancel out the atomizer in the event of a panic at the receiver because
+			// this cannot be effectively restarted without creating an inconsistent state
+			defer mizer.cancel()
+
+			for {
+				select {
+				case <-mizer.ctx.Done():
+					return
+
+				// Handle the external-registrations
+				case registration := <-externalRegistations:
 					if err := mizer.register(registration); err != nil {
 						mizer.sendErr(err)
 					}
-				} else {
-					// channel closed
-					panic("unexpected closing of the registrations channel in the atomizer")
+
+				// Handle the real-time registrations
+				case registration, ok := <-mizer.registrations:
+					if ok {
+						if err := mizer.register(registration); err != nil {
+							mizer.sendErr(err)
+						}
+					} else {
+						// channel closed
+						panic("unexpected closing of the registrations channel in the atomizer")
+					}
 				}
 			}
-		}
+		}()
 	} else {
-		panic("invalid atomizer object")
+		err = errors.New("invalid atomizer object")
 	}
+
+	return err
 }
 
 // register the different receivable interfaces into the atomizer from wherever they were sent from
