@@ -1,35 +1,10 @@
 package registration
 
 import (
-	"context"
 	"testing"
-
-	"github.com/benjivesterby/atomizer"
-
-	"github.com/benjivesterby/validator"
 )
 
-type atomTestStruct struct {
-	id string
-}
-
-func (atomteststr *atomTestStruct) Validate() (valid bool) {
-	return atomteststr != nil
-}
-
-func (atomteststr *atomTestStruct) Process(ctx context.Context, electron atomizer.Electron, outbound chan<- atomizer.Electron) (result <-chan []byte, err <-chan error) {
-	return result, err
-}
-
-func (atomteststr *atomTestStruct) ID() string { return atomteststr.id }
-
-type nonatomtestregister struct {
-	id string
-}
-
-func (nonatomtestreg *nonatomtestregister) Validate() (valid bool) {
-	return len(nonatomtestreg.id) > 0
-}
+type testStruct struct{}
 
 func TestRegister(t *testing.T) {
 	tests := []struct {
@@ -39,22 +14,12 @@ func TestRegister(t *testing.T) {
 	}{
 		{ // Valid test
 			"ValidTest",
-			&atomTestStruct{},
+			&testStruct{},
 			false,
 		},
-		{ // Invalid test because key has length of 0
-			"",
-			&atomTestStruct{},
-			true,
-		},
-		{ // Invalid test because the value passed is nil and nil values cannot be registered
-			"FailNil",
+		{ // Invalid test because value is nil
+			"NilRegistrationTest",
 			nil,
-			true,
-		},
-		{ // Invalid test because the struct doesn't implement atom
-			"wronginterface",
-			&nonatomtestregister{},
 			true,
 		},
 	}
@@ -64,9 +29,9 @@ func TestRegister(t *testing.T) {
 	for _, test := range tests {
 		if err := Register(test.key, test.value); err == nil {
 			if value, ok := preRegistrations.Load(test.key); ok {
-				if atomValue, ok := value.(atomizer.Atom); ok {
-					if !validator.IsValid(atomValue) {
-						t.Errorf("Test key [%s] failed because the returned value was invalid", test.key)
+				if _, ok := value.(*testStruct); ok {
+					if test.err {
+						t.Errorf("Test key [%s] failed because expected a failure but got success", test.key)
 					}
 				} else {
 					t.Errorf("Test key [%s] failed because returned value failed type assertion", test.key)
