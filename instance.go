@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/benji-vesterby/validator"
+	"github.com/benjivesterby/validator"
 )
 
 type instance struct {

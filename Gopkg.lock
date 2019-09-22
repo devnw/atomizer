@@ -3,7 +3,7 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/benji-vesterby/atomizer"
+  name = "github.com/benjivesterby/atomizer"
   packages = [
     ".",
     "registration"
@@ -12,7 +12,7 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/benji-vesterby/validator"
+  name = "github.com/benjivesterby/validator"
   packages = ["."]
   revision = "56f94887ae25c2fff3bbde194638587d9018c164"
 

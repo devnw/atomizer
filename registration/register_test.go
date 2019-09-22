@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/benji-vesterby/atomizer"
+	"github.com/benjivesterby/atomizer"
 
-	"github.com/benji-vesterby/validator"
+	"github.com/benjivesterby/validator"
 )
 
 type atomTestStruct struct {
