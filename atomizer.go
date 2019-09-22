@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/benji-vesterby/validator"
+	"github.com/benjivesterby/validator"
 	"github.com/pkg/errors"
 )
 

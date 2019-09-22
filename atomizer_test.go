@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benji-vesterby/atomizer/registration"
+	"github.com/benjivesterby/atomizer/registration"
 
-	"github.com/benji-vesterby/validator"
+	"github.com/benjivesterby/validator"
 )
 
 type invalidconductor struct{}
