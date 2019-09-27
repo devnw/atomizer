@@ -2,6 +2,7 @@ package atomizer
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"sync"
 
@@ -228,16 +229,23 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) (err er
 					// Break the loop to close out the receiver
 					mizer.sendErr(errors.Errorf("context closed for distribution of conductor [%v]; exiting [%s]", conductor.ID(), ctx.Err().Error()))
 					return
-				case electron, ok := <-conductor.Receive():
+				case e, ok := <-conductor.Receive():
 					if ok {
 
-						// Ensure that the electron being received is valid
-						if validator.IsValid(electron) {
+						var electron = &ElectronBase{}
+						if err = json.Unmarshal(e, electron); err == nil {
 
-							// Send the electron down the electrons channel to be processed
-							mizer.electrons <- instance{electron, conductor, nil, nil, nil}
+							// Ensure that the electron being received is valid
+							if validator.IsValid(electron) {
+
+								// Send the electron down the electrons channel to be processed
+								mizer.electrons <- instance{electron, conductor, nil, nil, nil}
+							} else {
+								mizer.sendErr(errors.Errorf("invalid electron passed to atomizer [%v]", electron))
+							}
+
 						} else {
-							mizer.sendErr(errors.Errorf("invalid electron passed to atomizer [%v]", electron))
+							// TODO: Error parsing the electron, return an error back to the conductor
 						}
 					} else { // Channel is closed, break out of the loop
 						mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", conductor.ID()))
@@ -344,7 +352,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 								// TODO: Error here
 							}
 						} else {
-							err = errors.Errorf("unable to type assert atom for id [%s]", inst.electron.Atom())
+							err = errors.Errorf("unable to type assert atom [%s] for electron id [%s]", inst.electron.AtomID, inst.electron.ID())
 						}
 					} else { // Channel is closed, break out of the loop
 						mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", atom.ID()))
@@ -384,7 +392,7 @@ func (mizer *atomizer) distribute(ctx context.Context) {
 							var achan chan<- instance
 
 							mizer.atomFanOutMut.RLock()
-							achan = mizer.atomFanOut[ewrap.electron.Atom()]
+							achan = mizer.atomFanOut[ewrap.electron.AtomID]
 							mizer.atomFanOutMut.RUnlock()
 
 							// Pass the electron to the correct atom channel if it is not nil

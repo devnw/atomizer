@@ -1,4 +1,4 @@
-package registration
+package atomizer
 
 import (
 	"context"
@@ -74,20 +74,27 @@ func Register(key interface{}, value interface{}) (err error) {
 	if validator.IsValid(key) {
 		if validator.IsValid(value) {
 
-			// If the regchan is valid and initialized then send the value directly to the receiver
-			// this will handle any plugins where init is called at plugin load time so that the
-			// different registrations are handled immediately and the map doesn't have to be monitored
-			// by the registration methods
-			if regchan != nil {
-				regchan <- value
-			} else {
+			// Type assert the value to ensure we're only registering expected values in the maps
+			switch value.(type) {
+			case Conductor, Atom:
 
-				// Ensure the key is not being duplicated in the pre-registration map
-				if _, ok := preRegistrations.Load(key); !ok {
-					preRegistrations.Store(key, value)
+				// If the regchan is valid and initialized then send the value directly to the receiver
+				// this will handle any plugins where init is called at plugin load time so that the
+				// different registrations are handled immediately and the map doesn't have to be monitored
+				// by the registration methods
+				if regchan != nil {
+					regchan <- value
 				} else {
-					err = errors.Errorf("cannot register item [%s] because this key is already in use", key)
+
+					// Ensure the key is not being duplicated in the pre-registration map
+					if _, ok := preRegistrations.Load(key); !ok {
+						preRegistrations.Store(key, value)
+					} else {
+						err = errors.Errorf("cannot register item [%s] because this key is already in use", key)
+					}
 				}
+			default:
+				err = errors.Errorf("cannot register item [%s] because it is not a supported type", key)
 			}
 		} else {
 			err = errors.Errorf("cannot register item [%s] because it is invalid", key)

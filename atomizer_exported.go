@@ -3,7 +3,6 @@ package atomizer
 import (
 	"context"
 
-	"github.com/benjivesterby/atomizer/registration"
 	"github.com/benjivesterby/validator"
 	"github.com/pkg/errors"
 )
@@ -39,7 +38,7 @@ func (mizer *atomizer) Exec() (err error) {
 		mizer.execSyncOnce.Do(func() {
 
 			// Start up the receivers
-			err = mizer.receive(registration.Registrations(mizer.ctx))
+			err = mizer.receive(Registrations(mizer.ctx))
 
 			// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
 		})

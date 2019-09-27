@@ -5,10 +5,11 @@ import (
 	"time"
 
 	"github.com/benjivesterby/validator"
+	"github.com/pkg/errors"
 )
 
 type instance struct {
-	electron   Electron
+	electron   *ElectronBase
 	conductor  Conductor
 	atom       Atom
 	properties *properties
@@ -20,32 +21,31 @@ type instance struct {
 func (inst *instance) bond(atom Atom) (err error) {
 
 	if validator.IsValid(inst.electron) {
-
 		if validator.IsValid(inst.conductor) {
-
-			inst.atom = atom
-
-			if !validator.IsValid(inst.atom) {
-				// TODO:
+			if validator.IsValid(inst.atom) {
+				inst.atom = atom
+			} else {
+				err = errors.Errorf("invalid atom [%s] when attempting to bond", atom.ID())
 			}
 		} else {
-			// TODO:
+			err = errors.Errorf("invalid conductor [%v] when attempting to bond", inst.conductor.ID())
 		}
 	} else {
-		// TODO:
+		err = errors.Errorf("invalid electron [%s] when attempting to bond", inst.electron.ElectronID)
 	}
 
 	return err
 }
 
+// execute runs the process method on the bonded atom / electron pair
 func (inst *instance) execute(ctx context.Context) {
 
 	if validator.IsValid(inst) {
 
 		// Initialize the new context object for the processing of the electron/atom
-		if inst.electron.Timeout() != nil {
+		if inst.electron.Timeout != nil {
 			// Create a new context for the electron with a timeout
-			ctx, inst.cancel = context.WithTimeout(ctx, *inst.electron.Timeout())
+			ctx, inst.cancel = context.WithTimeout(ctx, *inst.electron.Timeout)
 		} else {
 			// Create a new context for the electron with a cancellation option
 			ctx, inst.cancel = context.WithCancel(ctx)
@@ -61,14 +61,13 @@ func (inst *instance) execute(ctx context.Context) {
 		// stream in from the process method
 		// Execute the process method of the atom
 		var results <-chan []byte
-		var errstream <-chan error
-		results, errstream = inst.atom.Process(ctx, inst.electron, nil) // TODO: setup outbound
+		results = inst.atom.Process(ctx, inst.electron, nil) // TODO: setup outbound
 
 		// Update the status of the bonded atom/electron to show processing
 		// TODO: inst.properties.status = PROCESSING
 
 		// Continue looping while either of the channels is non-nil and open
-		for results != nil || errstream != nil {
+		for results != nil {
 			select {
 			// Monitor the instance context for cancellation
 			case <-ctx.Done():
@@ -80,14 +79,6 @@ func (inst *instance) execute(ctx context.Context) {
 				} else {
 					// nil out the result channel after it's closed so that the loop breaks
 					result = nil
-				}
-			case err, ok := <-errstream:
-				// Append the errors from the bonded instance for return through the properties
-				if ok {
-					inst.properties.AddError(err)
-				} else {
-					// nil out the err channel after it's closed so that the loop breaks
-					errstream = nil
 				}
 			}
 		}
@@ -103,10 +94,11 @@ func (inst *instance) execute(ctx context.Context) {
 		//  at the conductor rather than here... unless the conductor overrode the call back
 
 		// TODO: Execute the callback with the noficiation here?
-
-		// TODO: Execute the electron callback here
-		inst.electron.Callback(inst.properties)
-
+		// TODO: determine if this is the correct location or if this is something that should be handled purely by the conductor
+		if inst.electron.Resp != nil {
+			// Drop the return for this electron onto the channel to be sent back to the requester
+			inst.electron.Resp <- inst.properties
+		}
 	} else {
 		// TODO: invalid
 	}

@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benjivesterby/atomizer/registration"
-
 	"github.com/benjivesterby/validator"
 )
 
@@ -14,12 +12,12 @@ type invalidconductor struct{}
 
 type validcondcutor struct {
 	id    string
-	echan <-chan Electron
+	echan <-chan []byte
 	valid bool
 }
 
 func (cond *validcondcutor) ID() string                                    { return cond.id }
-func (cond *validcondcutor) Receive() <-chan Electron                      { return cond.echan }
+func (cond *validcondcutor) Receive() <-chan []byte                        { return cond.echan }
 func (cond *validcondcutor) Send(electron Electron) (result <-chan []byte) { return nil }
 func (cond *validcondcutor) Validate() (valid bool)                        { return cond.valid && cond.echan != nil }
 func (cond *validcondcutor) Complete(properties Properties)                {}
@@ -38,7 +36,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 		{
 			"ValidTestValidConductor",
-			&validcondcutor{"ValidTestValidConductor", make(<-chan Electron), true},
+			&validcondcutor{"ValidTestValidConductor", make(<-chan []byte), true},
 			false,
 		},
 		{
@@ -60,12 +58,12 @@ func TestAtomizeNoConductors(t *testing.T) {
 
 	for _, test := range tests {
 		// Reset sync map for this test
-		registration.Clean()
+		Clean()
 
 		// Store the test conductor
 		if test.err || (!test.err && test.value != nil) {
 			// Store invalid conductor
-			registration.Register(test.key, test.value)
+			Register(test.key, test.value)
 		}
 
 		mizer := Atomize(context.Background())
@@ -80,7 +78,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		}
 
 		// Cleanup sync map for additional tests
-		registration.Clean()
+		Clean()
 	}
 }
 
@@ -92,12 +90,12 @@ func TestAtomizer_AddConductor(t *testing.T) {
 	}{
 		{
 			"ValidTestEmptyConductor",
-			&validcondcutor{"ValidTestEmptyConductor", make(<-chan Electron), true},
+			&validcondcutor{"ValidTestEmptyConductor", make(<-chan []byte), true},
 			false,
 		},
 		{
 			"InvalidTestConductor",
-			&validcondcutor{"InvalidTestConductor", make(<-chan Electron), false},
+			&validcondcutor{"InvalidTestConductor", make(<-chan []byte), false},
 			true,
 		},
 		{
@@ -124,7 +122,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 
 	for _, test := range tests {
 		// Reset sync map for this test
-		registration.Clean()
+		Clean()
 
 		func() {
 			var ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
@@ -138,7 +136,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 					if validator.IsValid(mizer) {
 
 						// Add the conductor
-						if err = registration.Register(test.key, test.value); err == nil {
+						if err = Register(test.key, test.value); err == nil {
 
 							select {
 							case <-ctx.Done():
@@ -165,7 +163,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 		}()
 
 		// Cleanup sync map for additional tests
-		registration.Clean()
+		Clean()
 	}
 }
 
