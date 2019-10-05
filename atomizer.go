@@ -186,7 +186,6 @@ func (mizer *atomizer) register(registration interface{}) (err error) {
 			case Conductor:
 				err = mizer.receiveConductor(v)
 			case Atom:
-				fmt.Println("starting atom receiver")
 				err = mizer.receiveAtom(v)
 			default:
 				// TODO: error here because the type is unknown
@@ -250,15 +249,12 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) (err er
 				case e, ok := <-conductor.Receive(ctx):
 					if ok {
 
-						fmt.Println("pulled electron from chan")
 						var electron = &ElectronBase{}
 						if err = json.Unmarshal(e, electron); err == nil {
 
-							fmt.Printf("electron %v\n", electron)
 							// Ensure that the electron being received is valid
 							if validator.IsValid(electron) {
 
-								fmt.Println("pushing instance onto electron channel")
 								// Send the electron down the electrons channel to be processed
 								mizer.electrons <- instance{electron, conductor, nil, nil, nil}
 							} else {
@@ -289,14 +285,12 @@ func (mizer *atomizer) receiveAtom(atom Atom) (err error) {
 		// Ensure this is a valid conductor
 		if ok := validator.IsValid(atom); ok {
 
-			fmt.Println("splitting atom")
 			var electrons chan<- instance
 			// setup atom receiver
 			if electrons, err = mizer.split(mizer.ctx, atom); err == nil {
 
 				if electrons != nil {
 
-					fmt.Println("registering electron chan")
 					// Register the atom into the atomizer for receiving electrons
 					mizer.atomFanOutMut.Lock()
 					mizer.atomFanOut[atom.ID()] = electrons
@@ -347,8 +341,6 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 					return
 				case inst, ok := <-electrons:
 					if ok {
-
-						fmt.Println("got instance")
 
 						// TODO: implement the processing push
 						// TODO: after the processing has started push to instances channel for monitoring by the
