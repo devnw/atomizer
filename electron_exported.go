@@ -1,7 +1,6 @@
 package atomizer
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -13,7 +12,7 @@ type Electron interface {
 	ID() string
 
 	// Payload returns the Raw Json Payload that was passed from the conductor
-	Payload() *json.RawMessage
+	Payload() []byte
 
 	// Respond returns the response channel for the properties that this electron
 	// returns after processing
@@ -32,12 +31,12 @@ type ElectronBase struct {
 	// Timeout is the maximum time duration that should be allowed for this instance
 	// to process. After the duration is exceeded the context should be cancelled and
 	// the processing released and a failure sent back to the conductor
-	Timeout *time.Duration `json:"timeout"`
+	Timeout *time.Duration `json:"timeout,omitempty"`
 
 	// Load is to be used by the registered atom to properly unmarshall
 	// the json for the actual atom instance. RawMessage is used to delay unmarshalling
 	// of the payload information so the atom can do it internally
-	Load *json.RawMessage `json:"payload,omitempty"`
+	Load []byte `json:"payload,omitempty"`
 
 	// Resp is the channel that returns messages from this spawned
 	// instance of the electron. The channel allows for blocking and if
@@ -51,7 +50,7 @@ func (e *ElectronBase) ID() string {
 }
 
 // Payload returns the Raw Json Payload that was passed from the conductor
-func (e *ElectronBase) Payload() *json.RawMessage {
+func (e *ElectronBase) Payload() []byte {
 	return e.Load
 }
 

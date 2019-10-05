@@ -22,7 +22,9 @@ func (inst *instance) bond(atom Atom) (err error) {
 
 	if validator.IsValid(inst.electron) {
 		if validator.IsValid(inst.conductor) {
-			if validator.IsValid(inst.atom) {
+
+			// Ensure the atom passed in is valid
+			if validator.IsValid(atom) {
 				inst.atom = atom
 			} else {
 				err = errors.Errorf("invalid atom [%s] when attempting to bond", atom.ID())
@@ -52,7 +54,10 @@ func (inst *instance) execute(ctx context.Context) {
 		}
 
 		inst.properties = &properties{
-			status: PENDING,
+			status:     PENDING,
+			electronID: inst.electron.ElectronID,
+			atomID:     inst.atom.ID(),
+			start:      time.Now(),
 		}
 
 		// TODO: Log the execution of the process method here
@@ -66,21 +71,28 @@ func (inst *instance) execute(ctx context.Context) {
 		// Update the status of the bonded atom/electron to show processing
 		// TODO: inst.properties.status = PROCESSING
 
-		// Continue looping while either of the channels is non-nil and open
-		for results != nil {
-			select {
-			// Monitor the instance context for cancellation
-			case <-ctx.Done():
-				// TODO: mizer.sendLog(fmt.Sprintf("cancelling electron instance [%v] due to cancellation [%s]", ewrap.electron.ID(), instance.ctx.Err().Error()))
-			case result, ok := <-results:
-				// Append the results from the bonded instance for return through the properties
-				if ok {
-					inst.properties.AddResult(result)
-				} else {
-					// nil out the result channel after it's closed so that the loop breaks
-					result = nil
+		if results != nil {
+
+			func() {
+				// Continue looping while either of the channels is non-nil and open
+				for results != nil {
+					select {
+					// Monitor the instance context for cancellation
+					case <-ctx.Done():
+						// TODO: mizer.sendLog(fmt.Sprintf("cancelling electron instance [%v] due to cancellation [%s]", ewrap.electron.ID(), instance.ctx.Err().Error()))
+						return
+					case result, ok := <-results:
+						if ok {
+							// Append the results from the bonded instance for return through the properties
+							inst.properties.AddResult(result)
+						} else {
+							return
+						}
+					}
 				}
-			}
+			}()
+		} else {
+			// TODO:
 		}
 
 		// TODO: The processing has finished for this bonded atom and the results need to be calculated and the properties sent back to the
@@ -93,12 +105,15 @@ func (inst *instance) execute(ctx context.Context) {
 		// TODO: Ensure mizer is the proper thing to do here?? I think it needs to close mizer out
 		//  at the conductor rather than here... unless the conductor overrode the call back
 
-		// TODO: Execute the callback with the noficiation here?
+		// TODO: Execute the callback with the notification here?
 		// TODO: determine if this is the correct location or if this is something that should be handled purely by the conductor
-		if inst.electron.Resp != nil {
-			// Drop the return for this electron onto the channel to be sent back to the requester
-			inst.electron.Resp <- inst.properties
-		}
+		// TODO: Handle this properly
+		// if inst.electron.Resp != nil {
+		// 	// Drop the return for this electron onto the channel to be sent back to the requester
+		// 	inst.electron.Resp <- inst.properties
+		// }
+
+		inst.conductor.Complete(ctx, inst.properties)
 	} else {
 		// TODO: invalid
 	}

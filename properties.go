@@ -9,11 +9,23 @@ import (
 // properties is the struct for storing properties information after the processing
 // of an atom has completed so that it can be sent to the original requestor
 type properties struct {
-	start   time.Time
-	end     time.Time
-	status  int
-	errs    []error
-	results [][]byte
+	electronID string
+	atomID     string
+	start      time.Time
+	end        time.Time
+	status     int
+	errs       []error
+	results    [][]byte
+}
+
+// ElectronID returns the identifier of the electron
+func (prop *properties) ElectronID() string {
+	return prop.electronID
+}
+
+// AtomID returns the identifier of the atom
+func (prop *properties) AtomID() string {
+	return prop.atomID
 }
 
 // StartTime indicates the time the processing of an atom began (UTC)
@@ -28,8 +40,8 @@ func (prop *properties) EndTime() (end time.Time) {
 	return prop.end
 }
 
-// ProcessingTime returns the duration of the process method on an atom for analysis by the calling system
-func (prop *properties) ProcessingTime() (ptime time.Duration) {
+// Duration returns the duration of the process method on an atom for analysis by the calling system
+func (prop *properties) Duration() (duration time.Duration) {
 	return prop.start.Sub(prop.end)
 }
 

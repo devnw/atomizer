@@ -40,7 +40,7 @@ func handle(obj interface{}, recovery func()) (err error) {
 			prelim = fmt.Sprintf("%s | ", err.Error())
 		}
 
-		err = errors.Errorf("%spanic occurred [%s]", prelim, r)
+		err = errors.Errorf("%s panic occurred [%s]", prelim, r)
 
 		// Initiate the recovery of the method that had a panic
 		if recovery != nil {

@@ -13,7 +13,6 @@ type Atomizer interface {
 	Register(value interface{}) error
 	Errors(buffer int) (<-chan error, error)
 	Properties(buffer int) (<-chan Properties, error)
-	Validate() bool
 }
 
 // Atomize initialize instance of the atomizer to start reading from conductors and execute bonded electrons/atoms
@@ -37,6 +36,8 @@ func (mizer *atomizer) Exec() (err error) {
 		// Execute on the atomizer should only ever be run once
 		mizer.execSyncOnce.Do(func() {
 
+			go mizer.distribute(mizer.ctx)
+
 			// Start up the receivers
 			err = mizer.receive(Registrations(mizer.ctx))
 
@@ -52,7 +53,7 @@ func (mizer *atomizer) Exec() (err error) {
 // Register allows you to add additional type registrations to the atomizer (ie. Conductors and Atoms)
 func (mizer *atomizer) Register(value interface{}) (err error) {
 
-	// validate the automizer initialization itself
+	// validate the atomizer initialization itself
 	if validator.IsValid(mizer) {
 
 		// Pass the value on the registrations channel to be received
@@ -69,7 +70,7 @@ func (mizer *atomizer) Register(value interface{}) (err error) {
 func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
 	var err error
 
-	// validate the automizer initialization itself
+	// validate the atomizer initialization itself
 	if validator.IsValid(mizer) {
 		if mizer.properties == nil {
 
@@ -92,7 +93,7 @@ func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
 func (mizer *atomizer) Errors(buffer int) (<-chan error, error) {
 	var err error
 
-	// validate the automizer initialization itself
+	// validate the atomizer initialization itself
 	if validator.IsValid(mizer) {
 		if mizer.errors == nil {
 
@@ -109,12 +110,4 @@ func (mizer *atomizer) Errors(buffer int) (<-chan error, error) {
 	}
 
 	return mizer.errors, err
-}
-
-// Validate verifies that this instance of the atomizer is correctly initialized. This imports the validator library
-// for extended use with the Validate method
-func (mizer *atomizer) Validate() (valid bool) {
-	valid = mizer.init() != nil
-
-	return valid
 }
