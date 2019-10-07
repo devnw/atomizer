@@ -71,29 +71,24 @@ func (inst *instance) execute(ctx context.Context) {
 		// Update the status of the bonded atom/electron to show processing
 		// TODO: inst.properties.status = PROCESSING
 
-		if results != nil {
-
-			func() {
-				// Continue looping while either of the channels is non-nil and open
-				for results != nil {
-					select {
-					// Monitor the instance context for cancellation
-					case <-ctx.Done():
-						// TODO: mizer.sendLog(fmt.Sprintf("cancelling electron instance [%v] due to cancellation [%s]", ewrap.electron.ID(), instance.ctx.Err().Error()))
+		func() {
+			// Continue looping while either of the channels is non-nil and open
+			for results != nil {
+				select {
+				// Monitor the instance context for cancellation
+				case <-ctx.Done():
+					// TODO: mizer.sendLog(fmt.Sprintf("cancelling electron instance [%v] due to cancellation [%s]", ewrap.electron.ID(), instance.ctx.Err().Error()))
+					return
+				case result, ok := <-results:
+					if ok {
+						// Append the results from the bonded instance for return through the properties
+						inst.properties.AddResult(result)
+					} else {
 						return
-					case result, ok := <-results:
-						if ok {
-							// Append the results from the bonded instance for return through the properties
-							inst.properties.AddResult(result)
-						} else {
-							return
-						}
 					}
 				}
-			}()
-		} else {
-			// TODO:
-		}
+			}
+		}()
 
 		// TODO: The processing has finished for this bonded atom and the results need to be calculated and the properties sent back to the
 		// conductor

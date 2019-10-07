@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/benjivesterby/validator"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
 )
 
 type invalidconductor struct{}
@@ -115,67 +115,26 @@ type printer struct{}
 
 func (p *printer) ID() string { return "printer" }
 func (p *printer) Process(ctx context.Context, electron Electron, outbound chan<- Electron) (result <-chan []byte) {
-	hk :=
-		`                              .ZMMMMMN.     ..:+=.
-	,NMNZ~..             .MMZZZZZMM,.ZMMMMMMMM?.
-  .+MM+=ZMMMMN......,++I7MMZZZZZZZMMMM~......+M~
-  ~M8.......~MMMMMMMMMMMMMZZZZZZZZZM8.........MM
-  MM...................~MZZZZZMMMMZMM8,.......MM.
- .MM...................NMZZZZZMZZMM8ZZMMMNMMMMMM.
- .MN...................M8ZZZZZMMMMZZZZZZMMZZZZZMM,
- .MM...................IMZZZZZZZMZZZZZZZMMZZZZZZMM
-  MMMM..................NMM8Z8MMM8ZZZZZZMMMMZZZZMM..
-  ,MM.....................+ZZ?,.?M8ZZZ8MMZMMZZZZMZ,,
- .MM..............................+MMMMZZ8ZZZZZMN.MMZ+~,
- +M7.................................~MZZZZZZMMMM.MMMMMM8I~,
-.MN...................................:MMMMMMN.,MIMMMMMMMMMN
-?M~.............................................MMMMMMMMMMMM
-NM..............................................MM.?ZMMMMMMM
-MM...........................................~NMMMMMMMMN8MMM
-..:+IMMZI:........................................?I=MM,......~78
-NN+,:MM,........~MMN.....................MMM+........MM
-,MI........ZMMM.....................MMMZ.......,MM
-.MM:,,......MN..........ZDZ:........+MZ........7MMMMMM
-+MMMMM,..................MIIIM+..................MM
-..  IMZ..................8MDMM................ZIMM,
-   ,MMMM=...................................,MMMMN
- .IMMMMM...................................~MM,..7MM,
-.NM?.  ,NMM7..............................ZMM+
-...      .,MMMMNI.....................IMMMM,
-	   .:NMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM,
-	 .NMM+ZZZMMZZZMM~~,,,,++??,M8ZZZMMZZ~7MMN,
-   .MMM.ZZ$,MMZZZZZM7~,,,,,,,,MMZZZZZMM.ZZ+.MMN
-  ~MM+MM~.ZMMZZZZZZZMMD:,,,~MM8ZZZZZZZMM+.ZMM+MM
- ,M8...:MMMMZZMMMMZZZZZ8MMM8ZZZZZMMM8ZZMMMM:...8M~
-,MZ......+MZZ8+..~MZZZZZZZZZZZZZM~..M8ZZM7......MM
-+M.......MMZZZM~,M8ZZZZZZZZZZZZZMM.~MZZZMM......?M
-,M~.....ZMZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ8M......MM
-.NM~....MMZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZMI....+MM
-  8MMMMMMMZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZMMMMMMM,
-	...:M8ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ8M+,,
-	   .M8ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ8M:M8
-	   ,M8ZZZZZZZZZZZZZZZMZZZZZZZZZZZZZZZZM,MN
-	   .MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM:M7
-	   ,MI..............7M...............+M:N,
-	   .MD..............7M...............ZM.+
-		MM..............?M,.............,MZ.
-		,MM.............MM7.............MM.,
-		 .NMMMMD?7IIZNMMM7MMMNZII7ZZMMMM7.+
-			..IZMNMMZ7,.....+7NMMMMZ+..MM8,
-								  ..?MMMN+
-								  .:NMMM8
-								 ..IMMMM+
-								..ZMMMM~
-								.,NMMMD.
-								..ZMMMM~     -Brandon Adamson
-								.,NMMMD
 
-------------------------------------------------
-Thank you for visiting https://asciiart.website/
-This ASCII pic can be found at
-https://asciiart.website/index.php?art=logos%20and%20insignias/hello%20kitty
-`
-	fmt.Println(hk)
+	if validator.IsValid(electron) {
+		var payload printerdata
+		var err error
+
+		if err = json.Unmarshal(electron.Payload(), &payload); err == nil {
+
+			fmt.Printf("message from electron [%s] is: %s\n", electron.ID(), payload.Message)
+		} else {
+			fmt.Println(err.Error())
+		}
+	}
+
+	return result
+}
+
+type bench struct{}
+
+func (b *bench) ID() string { return "bench" }
+func (b *bench) Process(ctx context.Context, electron Electron, outbound chan<- Electron) (result <-chan []byte) {
 	return result
 }
 
@@ -183,18 +142,25 @@ type printerdata struct {
 	Message string `json:"message"`
 }
 
-func TestAtomizer(t *testing.T) {
+func newElectron(atomID string, payload []byte) (electron *ElectronBase, err error) {
 
-	Clean()
+	id := uuid.New()
 
-	var err error
+	electron = &ElectronBase{
+		ElectronID: id.String(),
+		AtomID:     atomID,
+		Load:       payload,
+		Resp:       make(chan Properties),
+	}
+
+	return electron, err
+}
+
+// harness creates a valid atomizer that uses the passthrough conductor
+func harness(ctx context.Context) (c Conductor, err error) {
 	pass := &passthrough{
 		input: make(chan []byte),
 	}
-
-	// Setup a cancellation context for the test so that it has a limited time
-	var ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
 
 	if validator.IsValid(pass) {
 
@@ -204,48 +170,113 @@ func TestAtomizer(t *testing.T) {
 			// Register the atom so that it's there for processing requests from the conductor
 			if err = Register("printer", &printer{}); err == nil {
 
-				var payload = []byte("{\"message\":\"ruh roh\"}")
+				// Register the benchmark atom for the benchmark tests
+				if err = Register("bench", &bench{}); err == nil {
 
-				// Initialize the atomizer
-				mizer := Atomize(ctx)
+					// Initialize the atomizer
+					mizer := Atomize(ctx)
 
-				// Start the execution threads
-				if err = mizer.Exec(); err == nil {
-
-					// Send the electron onto the conductor
-					resp := pass.Send(ctx, &ElectronBase{
-						ElectronID: "Yabba Dabba Doo!",
-						AtomID:     "printer",
-						Load:       payload,
-						Resp:       make(chan Properties),
-					})
-
-					// Block until a result is returned from the instance
-					select {
-					case <-ctx.Done():
-						t.Error("context closed, test failed")
-					case result, ok := <-resp:
-						if ok {
-							spew.Dump(result)
-
-							fmt.Printf("Elapsed Time %s\n", result.EndTime().Sub(result.StartTime()).String())
-						} else {
-							t.Error("result channel closed, test failed")
-						}
+					// Start the execution threads
+					if err = mizer.Exec(); err == nil {
+						c = pass
 					}
-
-				} else {
-					t.Error(err.Error())
 				}
-			} else {
-				t.Error(err.Error())
 			}
-		} else {
-			t.Error(err.Error())
 		}
 	}
 
+	return c, err
+}
+
+func TestAtomizer_Exec(t *testing.T) {
+
 	Clean()
+
+	// Setup a cancellation context for the test so that it has a limited time
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	if conductor, err := harness(ctx); err == nil {
+
+		var payload = []byte(`{"message":"ruh roh"}`)
+		var sent = time.Now()
+		var e *ElectronBase
+
+		if e, err = newElectron("printer", payload); err == nil {
+
+			// Send the electron onto the conductor
+			resp := conductor.Send(ctx, e)
+
+			// Block until a result is returned from the instance
+			select {
+			case <-ctx.Done():
+				t.Error("context closed, test failed")
+			case result, ok := <-resp:
+				if ok {
+					if len(result.Errors()) == 0 {
+						spew.Dump(result)
+						t.Log(fmt.Sprintf("Electron Elapsed Processing Time %s\n", result.EndTime().Sub(result.StartTime()).String()))
+					} else {
+						// TODO: Errors returned from atom
+					}
+				} else {
+					t.Error("result channel closed, test failed")
+				}
+			}
+
+			fmt.Printf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
+		} else {
+			t.Error(err)
+		}
+
+	} else {
+
+	}
+
+	Clean()
+}
+
+func BenchmarkAtomizer_Exec_Single(b *testing.B) {
+	Clean()
+
+	// Setup a cancellation context for the test so that it has a limited time
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	var payload = []byte(`{"message":"bench}`)
+
+	if conductor, err := harness(ctx); err == nil {
+
+		// cleanup the benchmark timer to get correct measurements
+		b.ResetTimer()
+
+		for n := 0; n < b.N; n++ {
+			if e, err := newElectron("bench", payload); err == nil {
+				// Send the electron onto the conductor
+				resp := conductor.Send(ctx, e)
+
+				select {
+				case <-ctx.Done():
+					b.Error("context closed, test failed")
+				case result, ok := <-resp:
+					if ok {
+						if result != nil && len(result.Errors()) == 0 {
+							// DO NOTHING
+						} else {
+							b.Error("invalid benchmark")
+						}
+					} else {
+						b.Error("result channel closed, test failed")
+					}
+				}
+			} else {
+				b.Errorf("electron creation failure [%s]", err.Error())
+			}
+		}
+	} else {
+		b.Errorf("test harness failed [%s]", err.Error())
+	}
+
 }
 
 // Tests the atomizer creation method without a conductor
