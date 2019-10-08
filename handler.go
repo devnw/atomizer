@@ -1,32 +1,13 @@
 package atomizer
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
 )
 
-func nuke(obj interface{}) (err error) {
-
-	if c, ok := obj.(cancelable); ok {
-		// Cancel the object
-		err = c.Cancel()
-
-	}
-
-	return err
-}
-
-func handle(obj interface{}, recovery func()) (err error) {
-
-	// Only nuke the object if it's valid
-	if obj != nil {
-
-		// Nuke the object if it's cancelable
-		if err = nuke(obj); err != nil {
-			err = errors.Errorf("error while cancelling context | %s", err.Error())
-		}
-	}
+func handle(ctx context.Context, obj interface{}, recovery func()) (err error) {
 
 	// Handle the panic scenario by re-queueing the receiver for this conductor
 	if r := recover(); r != nil {
@@ -41,7 +22,14 @@ func handle(obj interface{}, recovery func()) (err error) {
 
 		// Initiate the recovery of the method that had a panic
 		if recovery != nil {
-			go recovery()
+
+			// Recover if the context isn't closed
+			select {
+			case <-ctx.Done():
+				// DO NOTHING, LET THE METHOD EXIT
+			default:
+				go recovery()
+			}
 		}
 	}
 

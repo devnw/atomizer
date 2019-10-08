@@ -4,20 +4,6 @@ import (
 	"testing"
 )
 
-type testStruct struct{}
-
-// ID returns the unique name of the conductor
-func (t *testStruct) ID() string { return "" }
-
-// Receive gets the atoms from the source that are available to atomize
-func (t *testStruct) Receive() <-chan []byte { return make(<-chan []byte) }
-
-// Complete mark the completion of an electron instance with applicable statistics
-func (t *testStruct) Complete(properties Properties) {}
-
-// Send sends electrons back out through the conductor for additional processing
-func (t *testStruct) Send(electron Electron) (result <-chan []byte) { return make(<-chan []byte) }
-
 type invalidTestStruct struct{}
 
 func TestRegister(t *testing.T) {
@@ -28,7 +14,7 @@ func TestRegister(t *testing.T) {
 	}{
 		{ // Valid test
 			"ValidTest",
-			&testStruct{},
+			&passthrough{input: make(chan []byte)},
 			false,
 		},
 		{ // Invalid test because value is nil
@@ -46,9 +32,9 @@ func TestRegister(t *testing.T) {
 	Clean()
 
 	for _, test := range tests {
-		if err := Register(test.key, test.value); err == nil {
+		if err := Register(nil, test.key, test.value); err == nil {
 			if value, ok := preRegistrations.Load(test.key); ok {
-				if _, ok := value.(*testStruct); ok {
+				if _, ok := value.(*passthrough); ok {
 					if test.err {
 						t.Errorf("Test key [%s] failed because expected a failure but got success", test.key)
 					}

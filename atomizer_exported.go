@@ -36,10 +36,10 @@ func (mizer *atomizer) Exec() (err error) {
 		// Execute on the atomizer should only ever be run once
 		mizer.execSyncOnce.Do(func() {
 
-			go mizer.distribute(mizer.ctx)
-
 			// Start up the receivers
-			err = mizer.receive(Registrations(mizer.ctx))
+			if err = mizer.receive(Registrations(mizer.ctx)); err == nil {
+				go mizer.distribute()
+			}
 
 			// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
 		})
@@ -57,7 +57,11 @@ func (mizer *atomizer) Register(value interface{}) (err error) {
 	if validator.IsValid(mizer) {
 
 		// Pass the value on the registrations channel to be received
-		mizer.registrations <- value
+		select {
+		case <-mizer.ctx.Done():
+			return
+		case mizer.registrations <- value:
+		}
 	} else {
 		err = errors.New("invalid object to register")
 	}

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/benjivesterby/validator"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 )
 
@@ -165,13 +164,13 @@ func harness(ctx context.Context) (c Conductor, err error) {
 	if validator.IsValid(pass) {
 
 		// Register the conductor so it's picked up when the atomizer is initialized
-		if err = Register(pass.ID(), pass); err == nil {
+		if err = Register(ctx, pass.ID(), pass); err == nil {
 
 			// Register the atom so that it's there for processing requests from the conductor
-			if err = Register("printer", &printer{}); err == nil {
+			if err = Register(ctx, "printer", &printer{}); err == nil {
 
 				// Register the benchmark atom for the benchmark tests
-				if err = Register("bench", &bench{}); err == nil {
+				if err = Register(ctx, "bench", &bench{}); err == nil {
 
 					// Initialize the atomizer
 					mizer := Atomize(ctx)
@@ -211,10 +210,10 @@ func TestAtomizer_Exec(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				t.Error("context closed, test failed")
+				return
 			case result, ok := <-resp:
 				if ok {
 					if len(result.Errors()) == 0 {
-						spew.Dump(result)
 						t.Log(fmt.Sprintf("Electron Elapsed Processing Time %s\n", result.EndTime().Sub(result.StartTime()).String()))
 					} else {
 						// TODO: Errors returned from atom
@@ -243,21 +242,20 @@ func BenchmarkAtomizer_Exec_Single(b *testing.B) {
 	var ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	var payload = []byte(`{"message":"bench}`)
-
 	if conductor, err := harness(ctx); err == nil {
 
 		// cleanup the benchmark timer to get correct measurements
 		b.ResetTimer()
 
 		for n := 0; n < b.N; n++ {
-			if e, err := newElectron("bench", payload); err == nil {
+			if e, err := newElectron("bench", nil); err == nil {
 				// Send the electron onto the conductor
 				resp := conductor.Send(ctx, e)
 
 				select {
 				case <-ctx.Done():
 					b.Error("context closed, test failed")
+					return
 				case result, ok := <-resp:
 					if ok {
 						if result != nil && len(result.Errors()) == 0 {
@@ -320,7 +318,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		// Store the test conductor
 		if test.err || (!test.err && test.value != nil) {
 			// Store invalid conductor
-			Register(test.key, test.value)
+			Register(nil, test.key, test.value)
 		}
 
 		mizer := Atomize(context.Background())
@@ -393,7 +391,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 					if validator.IsValid(mizer) {
 
 						// Add the conductor
-						if err = Register(test.key, test.value); err == nil {
+						if err = Register(ctx, test.key, test.value); err == nil {
 
 							select {
 							case <-ctx.Done():

@@ -93,22 +93,24 @@ func (mizer *atomizer) init() *atomizer {
 // If the error channel is not nil then send the error on the channel
 func (mizer *atomizer) sendErr(err error) {
 	if validator.IsValid(mizer) {
-		if mizer.errors != nil {
+		if err != nil {
 
 			fmt.Println(err.Error())
+			// if mizer.errors != nil {
 
-			// TODO:
-			// select {
-			// case <-mizer.ctx.Done():
+			// 	select {
+			// 	case <-mizer.ctx.Done():
 
-			// 	// Close the errors channel and return the context error to the requester
-			// 	close(mizer.errors)
-			// 	err = mizer.ctx.Err()
+			// 		// Close the errors channel and return the context error to the requester
+			// 		close(mizer.errors)
+			// 		err = mizer.ctx.Err()
 
-			// case mizer.errors <- err:
-			// 	// Sent the error on the channel
+			// 	case mizer.errors <- err:
+			// 		// Sent the error on the channel
+			// 	}
 			// }
 		}
+
 	}
 }
 
@@ -227,7 +229,7 @@ func (mizer *atomizer) receiveConductor(conductor Conductor) (err error) {
 
 // Reading in from a specific electron channel of a conductor and drop it onto the atomizer channel for electrons
 func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
-	defer mizer.sendErr(handle(conductor, func() {
+	defer mizer.sendErr(handle(ctx, conductor, func() {
 
 		// Self Heal - Re-place the conductor on the register channel for the atomizer
 		// to re-initialize so this stack can be garbage collected
@@ -243,7 +245,8 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 		select {
 		case <-ctx.Done():
 			// Break the loop to close out the receiver
-			mizer.sendErr(errors.Errorf("context closed for distribution of conductor [%v]; exiting [%s]", conductor.ID(), ctx.Err().Error()))
+			// TODO: Error here?
+			// mizer.sendErr(errors.Errorf("context closed for distribution of conductor [%v]; exiting [%s]", conductor.ID(), ctx.Err().Error()))
 			return
 		case e, ok := <-conductor.Receive(ctx):
 			if ok {
@@ -255,7 +258,11 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 					if validator.IsValid(electron) {
 
 						// Send the electron down the electrons channel to be processed
-						mizer.electrons <- instance{electron, conductor, nil, nil, nil}
+						select {
+						case <-mizer.ctx.Done():
+							return
+						case mizer.electrons <- instance{electron, conductor, nil, nil, nil}:
+						}
 					} else {
 						mizer.sendErr(errors.Errorf("invalid electron passed to atomizer [%v]", electron))
 					}
@@ -313,7 +320,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 	if validator.IsValid(mizer) {
 
 		go func(ctx context.Context, atom Atom, electrons <-chan instance) {
-			defer mizer.sendErr(handle(atom, func() {
+			defer mizer.sendErr(handle(ctx, atom, func() {
 
 				// remove the electron channel from the map of atoms so that it can be
 				// properly cleaned up before re-registering
@@ -331,7 +338,8 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 				select {
 				case <-ctx.Done():
 					// Break the loop to close out the receiver
-					mizer.sendErr(errors.Errorf("context closed for atom [%v]; exiting [%s]", atom.ID(), ctx.Err().Error()))
+					// TODO: Error here?
+					//mizer.sendErr(errors.Errorf("context closed for atom [%v]; exiting [%s]", atom.ID(), ctx.Err().Error()))
 					return
 				case inst, ok := <-electrons:
 					if ok {
@@ -390,7 +398,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 	return electrons, err
 }
 
-func (mizer *atomizer) distribute(ctx context.Context) {
+func (mizer *atomizer) distribute() {
 	// TODO: defer
 
 	// Only re-create the channel in the event that it's nil
@@ -401,7 +409,7 @@ func (mizer *atomizer) distribute(ctx context.Context) {
 	if validator.IsValid(mizer) {
 		for {
 			select {
-			case <-ctx.Done():
+			case <-mizer.ctx.Done():
 				return
 			case ewrap, ok := <-mizer.electrons:
 				if ok {
@@ -419,7 +427,11 @@ func (mizer *atomizer) distribute(ctx context.Context) {
 
 							// Pass the electron to the correct atom channel if it is not nil
 							if achan != nil {
-								achan <- ewrap
+								select {
+								case <-mizer.ctx.Done():
+									return
+								case achan <- ewrap:
+								}
 							} else {
 								// TODO:
 							}
