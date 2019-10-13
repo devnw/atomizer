@@ -27,6 +27,6 @@ type Properties interface {
 	// Errors returns the list of errors that occurred on this atom after all the processing had been completed
 	Errors() (errors []error)
 
-	// Results returns the list of results which are also byte slices
-	Results() (results [][]byte)
+	// Results returns the results of the processing
+	Results() (results []byte)
 }

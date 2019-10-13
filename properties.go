@@ -15,7 +15,7 @@ type properties struct {
 	end        time.Time
 	status     int
 	errs       []error
-	results    [][]byte
+	results    []byte
 }
 
 // ElectronID returns the identifier of the electron
@@ -56,16 +56,16 @@ func (prop *properties) Errors() (errors []error) {
 }
 
 // Results returns the list of results which are also byte slices
-func (prop *properties) Results() (results [][]byte) {
+func (prop *properties) Results() (results []byte) {
 	return prop.results
 }
 
-// AddResult adds a result entry to the properties
-func (prop *properties) AddResult(result []byte) {
+// SetResult adds a result entry to the properties
+func (prop *properties) SetResult(result []byte) {
 
 	// Only add the result if it's a valid result
 	if result != nil && len(result) > 0 {
-		prop.results = append(prop.results, result)
+		prop.results = result
 	}
 }
 

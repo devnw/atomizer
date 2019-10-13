@@ -82,7 +82,8 @@ func (inst *instance) execute(ctx context.Context) {
 				case result, ok := <-results:
 					if ok {
 						// Append the results from the bonded instance for return through the properties
-						inst.properties.AddResult(result)
+						inst.properties.SetResult(result)
+						return
 					} else {
 						return
 					}

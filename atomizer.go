@@ -377,41 +377,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 						// Initialize a new copy of the atom
 						newAtom := reflect.New(reflect.TypeOf(atom).Elem())
 
-						go func(ctx context.Context, inst instance, newAtom reflect.Value) {
-							// TODO: Handler here
-							// Type assert the new copy of the atom to an atom so that it can be used for processing
-							// and returned as a pointer for bonding
-							// the := is on purpose here to hide the original instance of the atom so that it's not
-							// being accidentally used in this section
-							if atom, ok := newAtom.Interface().(Atom); ok {
-								if validator.IsValid(atom) {
-
-									// bond the new atom instantiation to the electron instance
-									if err = inst.bond(atom); err == nil {
-
-										// TODO: add this back in after the sampler is working
-										// Push the instance to the next part of the process
-										// select {
-										// case <-ctx.Done():
-										// 	return
-										// case mizer.bonded <- inst:
-
-										// 	// Execute the instance after it's been picked up for monitoring
-										// 	inst.execute(ctx)
-										// }
-
-										// Execute the instance after it's been picked up for monitoring
-										go inst.execute(ctx)
-									} else {
-										err = errors.Errorf("error while bonding atom [%s]: [%s]", atom.ID(), err.Error())
-									}
-								} else {
-									err = errors.Errorf("invalid atom [%s]", atom.ID())
-								}
-							} else {
-								err = errors.Errorf("unable to type assert atom [%s] for electron id [%s]", inst.electron.AtomID, inst.electron.ID())
-							}
-						}(ctx, inst, newAtom)
+						go mizer.exec(ctx, inst, newAtom)
 					} else { // Channel is closed, break out of the loop
 						mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", atom.ID()))
 						return
@@ -424,6 +390,43 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 	}
 
 	return electrons, err
+}
+
+func (mizer *atomizer) exec(ctx context.Context, inst instance, newAtom reflect.Value) {
+	var err error
+	// TODO: Handler here
+	// Type assert the new copy of the atom to an atom so that it can be used for processing
+	// and returned as a pointer for bonding
+	// the := is on purpose here to hide the original instance of the atom so that it's not
+	// being accidentally used in this section
+	if a, ok := newAtom.Interface().(Atom); ok {
+		if validator.IsValid(a) {
+
+			// bond the new atom instantiation to the electron instance
+			if err = inst.bond(a); err == nil {
+
+				// TODO: add this back in after the sampler is working
+				// Push the instance to the next part of the process
+				// select {
+				// case <-ctx.Done():
+				// 	return
+				// case mizer.bonded <- inst:
+
+				// 	// Execute the instance after it's been picked up for monitoring
+				// 	inst.execute(ctx)
+				// }
+
+				// Execute the instance after it's been picked up for monitoring
+				inst.execute(ctx)
+			} else {
+				mizer.sendErr(errors.Errorf("error while bonding atom [%s]: [%s]", a.ID(), err.Error()))
+			}
+		} else {
+			mizer.sendErr(errors.Errorf("invalid atom [%s]", a.ID()))
+		}
+	} else {
+		mizer.sendErr(errors.Errorf("unable to type assert atom [%s] for electron id [%s]", inst.electron.AtomID, inst.electron.ID()))
+	}
 }
 
 func (mizer *atomizer) distribute() {
