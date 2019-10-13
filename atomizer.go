@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/benjivesterby/validator"
 	"github.com/pkg/errors"
@@ -264,12 +265,36 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 						case mizer.electrons <- instance{electron, conductor, nil, nil, nil}:
 						}
 					} else {
+
+						props := &properties{
+							electronID: electron.ElectronID,
+							atomID:     electron.AtomID,
+							start:      time.Now(),
+							end:        time.Now(),
+							status:     COMPLETED,
+							errs:       []error{err},
+							results:    nil,
+						}
+
 						mizer.sendErr(errors.Errorf("invalid electron passed to atomizer [%v]", electron))
+						conductor.Complete(ctx, props)
 					}
 
 				} else {
 					// TODO: Error parsing the electron, return an error back to the conductor
+
+					props := &properties{
+						electronID: "unable to parse",
+						atomID:     "unable to parse",
+						start:      time.Now(),
+						end:        time.Now(),
+						status:     COMPLETED,
+						errs:       []error{err},
+						results:    nil,
+					}
+
 					mizer.sendErr(err)
+					conductor.Complete(ctx, props)
 				}
 			} else { // Channel is closed, break out of the loop
 				mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", conductor.ID()))
@@ -352,38 +377,41 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 						// Initialize a new copy of the atom
 						newAtom := reflect.New(reflect.TypeOf(atom).Elem())
 
-						// Type assert the new copy of the atom to an atom so that it can be used for processing
-						// and returned as a pointer for bonding
-						// the := is on purpose here to hide the original instance of the atom so that it's not
-						// being accidentally used in this section
-						if atom, ok := newAtom.Interface().(Atom); ok {
-							if validator.IsValid(atom) {
+						go func(ctx context.Context, inst instance, newAtom reflect.Value) {
+							// TODO: Handler here
+							// Type assert the new copy of the atom to an atom so that it can be used for processing
+							// and returned as a pointer for bonding
+							// the := is on purpose here to hide the original instance of the atom so that it's not
+							// being accidentally used in this section
+							if atom, ok := newAtom.Interface().(Atom); ok {
+								if validator.IsValid(atom) {
 
-								// bond the new atom instantiation to the electron instance
-								if err = inst.bond(atom); err == nil {
+									// bond the new atom instantiation to the electron instance
+									if err = inst.bond(atom); err == nil {
 
-									// TODO: add this back in after the sampler is working
-									// Push the instance to the next part of the process
-									// select {
-									// case <-ctx.Done():
-									// 	return
-									// case mizer.bonded <- inst:
+										// TODO: add this back in after the sampler is working
+										// Push the instance to the next part of the process
+										// select {
+										// case <-ctx.Done():
+										// 	return
+										// case mizer.bonded <- inst:
 
-									// 	// Execute the instance after it's been picked up for monitoring
-									// 	inst.execute(ctx)
-									// }
+										// 	// Execute the instance after it's been picked up for monitoring
+										// 	inst.execute(ctx)
+										// }
 
-									// Execute the instance after it's been picked up for monitoring
-									inst.execute(ctx)
+										// Execute the instance after it's been picked up for monitoring
+										go inst.execute(ctx)
+									} else {
+										err = errors.Errorf("error while bonding atom [%s]: [%s]", atom.ID(), err.Error())
+									}
 								} else {
-									// TODO:
+									err = errors.Errorf("invalid atom [%s]", atom.ID())
 								}
 							} else {
-								// TODO: Error here
+								err = errors.Errorf("unable to type assert atom [%s] for electron id [%s]", inst.electron.AtomID, inst.electron.ID())
 							}
-						} else {
-							err = errors.Errorf("unable to type assert atom [%s] for electron id [%s]", inst.electron.AtomID, inst.electron.ID())
-						}
+						}(ctx, inst, newAtom)
 					} else { // Channel is closed, break out of the loop
 						mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", atom.ID()))
 						return

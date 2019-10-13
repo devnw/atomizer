@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Pallinder/go-randomdata"
 	"github.com/benjivesterby/validator"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 )
 
 type invalidconductor struct{}
@@ -56,6 +58,7 @@ func (pt *passthrough) Validate() (valid bool) { return pt.input != nil }
 
 func (pt *passthrough) Complete(ctx context.Context, properties Properties) (err error) {
 	if validator.IsValid(properties) {
+		// for rabbit mq drop properties onto the /basepath/electronid message path
 		if value, ok := pt.results.Load(properties.ElectronID()); ok {
 			if value != nil {
 				if resultChan, ok := value.(chan Properties); ok {
@@ -68,13 +71,13 @@ func (pt *passthrough) Complete(ctx context.Context, properties Properties) (err
 					case resultChan <- properties:
 					}
 				} else {
-					// TODO:
+					err = errors.New("unable to type assert electron properties channel")
 				}
 			} else {
-				// TODO:
+				err = errors.Errorf("nil properties channel returned for electron [%s]", properties.ElectronID())
 			}
 		} else {
-			// TODO:
+			err = errors.Errorf("unable to load properties channel from sync map for electron [%s]", properties.ElectronID())
 		}
 	}
 
@@ -101,6 +104,7 @@ func (pt *passthrough) Send(ctx context.Context, electron Electron) <-chan Prope
 					case <-ctx.Done():
 						return
 					case pt.input <- e:
+						// setup a monitoring thread for /basepath/electronid
 					}
 				}
 			}
@@ -134,6 +138,29 @@ type bench struct{}
 
 func (b *bench) ID() string { return "bench" }
 func (b *bench) Process(ctx context.Context, electron Electron, outbound chan<- Electron) (result <-chan []byte) {
+	return result
+}
+
+type returner struct{}
+
+func (b *returner) ID() string { return "returner" }
+func (b *returner) Process(ctx context.Context, electron Electron, outbound chan<- Electron) <-chan []byte {
+	result := make(chan []byte)
+
+	go func(result chan<- []byte) {
+		defer close(result)
+		if validator.IsValid(electron) {
+			var payload printerdata
+			var err error
+
+			if err = json.Unmarshal(electron.Payload(), &payload); err == nil {
+				result <- []byte(payload.Message)
+			} else {
+				fmt.Println(err.Error())
+			}
+		}
+	}(result)
+
 	return result
 }
 
@@ -172,12 +199,16 @@ func harness(ctx context.Context) (c Conductor, err error) {
 				// Register the benchmark atom for the benchmark tests
 				if err = Register(ctx, "bench", &bench{}); err == nil {
 
-					// Initialize the atomizer
-					mizer := Atomize(ctx)
+					// Register the benchmark atom for the benchmark tests
+					if err = Register(ctx, "returner", &returner{}); err == nil {
 
-					// Start the execution threads
-					if err = mizer.Exec(); err == nil {
-						c = pass
+						// Initialize the atomizer
+						mizer := Atomize(ctx)
+
+						// Start the execution threads
+						if err = mizer.Exec(); err == nil {
+							c = pass
+						}
 					}
 				}
 			}
@@ -185,6 +216,67 @@ func harness(ctx context.Context) (c Conductor, err error) {
 	}
 
 	return c, err
+}
+
+func TestAtomizer_Exec_Returner(t *testing.T) {
+
+	Clean()
+
+	// Setup a cancellation context for the test so that it has a limited time
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	if conductor, err := harness(ctx); err == nil {
+		msg := randomdata.SillyName()
+		message := fmt.Sprintf("{\"message\":\"%s\"}", msg)
+		payload := []byte(message)
+		sent := time.Now()
+
+		var e *ElectronBase
+		if e, err = newElectron("returner", payload); err == nil {
+
+			// Send the electron onto the conductor
+			resp := conductor.Send(ctx, e)
+
+			// Block until a result is returned from the instance
+			select {
+			case <-ctx.Done():
+				t.Error("context closed, test failed")
+				return
+			case result, ok := <-resp:
+				if ok {
+					if len(result.Errors()) == 0 {
+
+						if len(result.Results()) > 0 {
+							if string(result.Results()[0]) == msg {
+								t.Logf("EID [%s] - MATCH", result.ElectronID())
+							} else {
+								t.Errorf("%s != %s", msg, result.Results()[0])
+							}
+						} else {
+							t.Error("Expected Results")
+						}
+
+						t.Log(fmt.Sprintf("Electron Elapsed Processing Time %s\n", result.EndTime().Sub(result.StartTime()).String()))
+					} else {
+						// TODO: Errors returned from atom
+						t.Errorf("Error returned from atom: [%s]\n", result.Errors()[0])
+					}
+				} else {
+					t.Error("result channel closed, test failed")
+				}
+			}
+
+			fmt.Printf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
+		} else {
+			t.Error(err)
+		}
+
+	} else {
+
+	}
+
+	Clean()
 }
 
 func TestAtomizer_Exec(t *testing.T) {
@@ -227,6 +319,72 @@ func TestAtomizer_Exec(t *testing.T) {
 		} else {
 			t.Error(err)
 		}
+
+	} else {
+
+	}
+
+	Clean()
+}
+
+func TestAtomizer_Exec_Multiples(t *testing.T) {
+
+	Clean()
+
+	// Setup a cancellation context for the test so that it has a limited time
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	if conductor, err := harness(ctx); err == nil {
+		var sent = time.Now()
+
+		wg := sync.WaitGroup{}
+
+		// Spawn electrons
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 10; i++ {
+
+				var e *ElectronBase
+				var message = fmt.Sprintf("{\"message\":\"%s\"}", randomdata.SillyName())
+				var payload = []byte(message)
+				if e, err = newElectron("printer", payload); err == nil {
+
+					// Send the electron onto the conductor
+					resp := conductor.Send(ctx, e)
+
+					wg.Add(1)
+					go func(resp <-chan Properties) {
+						defer wg.Done()
+
+						// Block until a result is returned from the instance
+						select {
+						case <-ctx.Done():
+							t.Error("context closed, test failed")
+							return
+						case result, ok := <-resp:
+							if ok {
+								if len(result.Errors()) == 0 {
+									fmt.Printf("Electron Elapsed Processing Time %s\n", result.EndTime().Sub(result.StartTime()).String())
+								} else {
+									// TODO: Errors returned from atom
+								}
+							} else {
+								t.Error("result channel closed, test failed")
+							}
+						}
+					}(resp)
+				} else {
+					t.Error(err)
+				}
+
+				time.Sleep(time.Millisecond * 50)
+			}
+		}()
+
+		wg.Wait()
+		fmt.Printf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
 
 	} else {
 
