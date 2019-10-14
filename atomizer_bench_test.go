@@ -30,7 +30,7 @@ func BenchmarkAtomizer_Exec_Single(b *testing.B) {
 					return
 				case result, ok := <-resp:
 					if ok {
-						if result != nil && len(result.Errors()) == 0 {
+						if result != nil && result.Error() == nil {
 							// DO NOTHING
 						} else {
 							b.Error("invalid benchmark")
@@ -46,7 +46,6 @@ func BenchmarkAtomizer_Exec_Single(b *testing.B) {
 	} else {
 		b.Errorf("test harness failed [%s]", err.Error())
 	}
-
 }
 
 // Benchmarks the creation of an atomizer instance

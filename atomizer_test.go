@@ -11,6 +11,64 @@ import (
 	"github.com/benjivesterby/validator"
 )
 
+func TestAtomizer_Exec(t *testing.T) {
+
+	Clean()
+
+	// Setup a cancellation context for the test so that it has a limited time
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	if conductor, err := harness(ctx); err == nil {
+
+		msg := randomdata.SillyName()
+		e, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
+		test := &tresult{
+			result:   msg,
+			electron: e,
+		}
+
+		var sent = time.Now()
+
+		// Send the electron onto the conductor
+		resp := conductor.Send(ctx, test.electron)
+
+		// Block until a result is returned from the instance
+		select {
+		case <-ctx.Done():
+			t.Error("context closed, test failed")
+			return
+		case result, ok := <-resp:
+			if ok {
+				if result.Error() == nil {
+
+					if len(result.Result()) > 0 {
+						res := string(result.Result())
+						if res == test.result {
+							t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID(), result.EndTime().Sub(result.StartTime()).String())
+						} else {
+							t.Errorf("%s != %s", test.result, res)
+						}
+					} else {
+						t.Error("results length is not 1")
+					}
+				} else {
+					t.Errorf("Error returned from atom: [%s]\n", result.Error())
+				}
+			} else {
+				t.Error("result channel closed, test failed")
+			}
+		}
+
+		t.Logf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
+
+	} else {
+
+	}
+
+	Clean()
+}
+
 func TestAtomizer_Exec_Returner(t *testing.T) {
 
 	Clean()
@@ -20,7 +78,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 	defer cancel()
 
 	var tests []*tresult
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 1000; i++ {
 		msg := randomdata.SillyName()
 
 		e, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
@@ -55,10 +113,10 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 						return
 					case result, ok := <-resp:
 						if ok {
-							if len(result.Errors()) == 0 {
+							if result.Error() == nil {
 
-								if len(result.Results()) > 0 {
-									res := string(result.Results())
+								if len(result.Result()) > 0 {
+									res := string(result.Result())
 									if res == test.result {
 										t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID(), result.EndTime().Sub(result.StartTime()).String())
 									} else {
@@ -68,7 +126,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 									t.Error("results length is not 1")
 								}
 							} else {
-								t.Errorf("Error returned from atom: [%s]\n", result.Errors())
+								t.Errorf("Error returned from atom: [%s]\n", result.Error())
 							}
 						} else {
 							t.Error("result channel closed, test failed")
@@ -83,120 +141,6 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 
 	} else {
 		t.Error("error while executing harness")
-	}
-
-	Clean()
-}
-
-func TestAtomizer_Exec(t *testing.T) {
-
-	Clean()
-
-	// Setup a cancellation context for the test so that it has a limited time
-	var ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
-
-	if conductor, err := harness(ctx); err == nil {
-
-		var payload = []byte(`{"message":"ruh roh"}`)
-		var sent = time.Now()
-		var e *ElectronBase
-
-		if e, err = newElectron("printer", payload); err == nil {
-
-			// Send the electron onto the conductor
-			resp := conductor.Send(ctx, e)
-
-			// Block until a result is returned from the instance
-			select {
-			case <-ctx.Done():
-				t.Error("context closed, test failed")
-				return
-			case result, ok := <-resp:
-				if ok {
-					if len(result.Errors()) == 0 {
-						t.Log(fmt.Sprintf("Electron Elapsed Processing Time %s\n", result.EndTime().Sub(result.StartTime()).String()))
-					} else {
-						// TODO: Errors returned from atom
-					}
-				} else {
-					t.Error("result channel closed, test failed")
-				}
-			}
-
-			fmt.Printf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
-		} else {
-			t.Error(err)
-		}
-
-	} else {
-
-	}
-
-	Clean()
-}
-
-func TestAtomizer_Exec_Multiples(t *testing.T) {
-
-	Clean()
-
-	// Setup a cancellation context for the test so that it has a limited time
-	var ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
-
-	if conductor, err := harness(ctx); err == nil {
-		var sent = time.Now()
-
-		wg := sync.WaitGroup{}
-
-		// Spawn electrons
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; i < 10; i++ {
-
-				var e *ElectronBase
-				var message = fmt.Sprintf("{\"message\":\"%s\"}", randomdata.SillyName())
-				var payload = []byte(message)
-				if e, err = newElectron("printer", payload); err == nil {
-
-					// Send the electron onto the conductor
-					resp := conductor.Send(ctx, e)
-
-					wg.Add(1)
-					go func(resp <-chan Properties) {
-						defer wg.Done()
-
-						// Block until a result is returned from the instance
-						select {
-						case <-ctx.Done():
-							t.Error("context closed, test failed")
-							return
-						case result, ok := <-resp:
-							if ok {
-								if len(result.Errors()) == 0 {
-									fmt.Printf("Electron Elapsed Processing Time %s\n", result.EndTime().Sub(result.StartTime()).String())
-								} else {
-									// TODO: Errors returned from atom
-								}
-							} else {
-								t.Error("result channel closed, test failed")
-							}
-						}
-					}(resp)
-				} else {
-					t.Error(err)
-				}
-
-				time.Sleep(time.Millisecond * 50)
-			}
-		}()
-
-		wg.Wait()
-		fmt.Printf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
-
-	} else {
-
 	}
 
 	Clean()

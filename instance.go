@@ -2,6 +2,7 @@ package atomizer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/benjivesterby/validator"
@@ -54,11 +55,21 @@ func (inst *instance) execute(ctx context.Context) {
 		}
 
 		inst.properties = &properties{
-			status:     PENDING,
 			electronID: inst.electron.ElectronID,
 			atomID:     inst.atom.ID(),
 			start:      time.Now(),
 		}
+
+		// Setup defer for this instance
+		defer func() {
+
+			// Set the end time and status in the properties
+			inst.properties.end = time.Now()
+
+			if err := inst.conductor.Complete(ctx, inst.properties); err != nil {
+				fmt.Println(err.Error())
+			}
+		}()
 
 		// TODO: Log the execution of the process method here
 		// TODO: build a properties object for this process here to store the results and errors into as they
@@ -67,9 +78,6 @@ func (inst *instance) execute(ctx context.Context) {
 		// Execute the process method of the atom
 		var results <-chan []byte
 		results = inst.atom.Process(ctx, inst.electron, nil) // TODO: setup outbound
-
-		// Update the status of the bonded atom/electron to show processing
-		// TODO: inst.properties.status = PROCESSING
 
 		func() {
 			// Continue looping while either of the channels is non-nil and open
@@ -82,21 +90,15 @@ func (inst *instance) execute(ctx context.Context) {
 				case result, ok := <-results:
 					if ok {
 						// Append the results from the bonded instance for return through the properties
-						inst.properties.SetResult(result)
-						return
-					} else {
-						return
+						inst.properties.result = result
 					}
+					return
 				}
 			}
 		}()
 
 		// TODO: The processing has finished for this bonded atom and the results need to be calculated and the properties sent back to the
 		// conductor
-
-		// Set the end time and status in the properties
-		inst.properties.end = time.Now()
-		inst.properties.status = COMPLETED
 
 		// TODO: Ensure mizer is the proper thing to do here?? I think it needs to close mizer out
 		//  at the conductor rather than here... unless the conductor overrode the call back
@@ -109,7 +111,6 @@ func (inst *instance) execute(ctx context.Context) {
 		// 	inst.electron.Resp <- inst.properties
 		// }
 
-		inst.conductor.Complete(ctx, inst.properties)
 	} else {
 		// TODO: invalid
 	}

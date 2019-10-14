@@ -271,9 +271,8 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 							atomID:     electron.AtomID,
 							start:      time.Now(),
 							end:        time.Now(),
-							status:     COMPLETED,
-							errs:       []error{err},
-							results:    nil,
+							err:        err,
+							result:     nil,
 						}
 
 						mizer.sendErr(errors.Errorf("invalid electron passed to atomizer [%v]", electron))
@@ -282,19 +281,14 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 
 				} else {
 					// TODO: Error parsing the electron, return an error back to the conductor
-
-					props := &properties{
+					conductor.Complete(ctx, &properties{
 						electronID: "unable to parse",
 						atomID:     "unable to parse",
 						start:      time.Now(),
 						end:        time.Now(),
-						status:     COMPLETED,
-						errs:       []error{err},
-						results:    nil,
-					}
-
-					mizer.sendErr(err)
-					conductor.Complete(ctx, props)
+						err:        err,
+						result:     nil,
+					})
 				}
 			} else { // Channel is closed, break out of the loop
 				mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", conductor.ID()))

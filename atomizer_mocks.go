@@ -110,6 +110,12 @@ func (pt *passthrough) Send(ctx context.Context, electron Electron) <-chan Prope
 					case pt.input <- e:
 						// setup a monitoring thread for /basepath/electronid
 					}
+				} else {
+					defer close(result)
+					p := &properties{}
+					p.err = errors.Errorf("duplicate electron registration for EID [%s]", electron.ID())
+
+					result <- p
 				}
 			}
 		}(result)
