@@ -2,27 +2,149 @@ package atomizer
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/benjivesterby/atomizer/registration"
-
+	"github.com/Pallinder/go-randomdata"
 	"github.com/benjivesterby/validator"
 )
 
-type invalidconductor struct{}
+// TODO: Add result nil checks on conductor response
 
-type validcondcutor struct {
-	id    string
-	echan <-chan Electron
-	valid bool
+func TestAtomizer_Exec(t *testing.T) {
+
+	Clean()
+	defer Clean()
+
+	// Setup a cancellation context for the test so that it has a limited time
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	if conductor, err := harness(ctx); err == nil {
+
+		msg := randomdata.SillyName()
+		e, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
+		test := &tresult{
+			result:   msg,
+			electron: e,
+		}
+
+		var sent = time.Now()
+
+		// Send the electron onto the conductor
+		resp := conductor.Send(ctx, test.electron)
+
+		// Block until a result is returned from the instance
+		select {
+		case <-ctx.Done():
+			t.Error("context closed, test failed")
+			return
+		case result, ok := <-resp:
+			if ok {
+				if result.Error() == nil {
+
+					if len(result.Result()) > 0 {
+						res := string(result.Result())
+						if res == test.result {
+							t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID(), result.EndTime().Sub(result.StartTime()).String())
+						} else {
+							t.Errorf("%s != %s", test.result, res)
+						}
+					} else {
+						t.Error("results length is not 1")
+					}
+				} else {
+					t.Errorf("Error returned from atom: [%s]\n", result.Error())
+				}
+			} else {
+				t.Error("result channel closed, test failed")
+			}
+		}
+
+		t.Logf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
+
+	} else {
+
+	}
 }
 
-func (cond *validcondcutor) ID() string                                    { return cond.id }
-func (cond *validcondcutor) Receive() <-chan Electron                      { return cond.echan }
-func (cond *validcondcutor) Send(electron Electron) (result <-chan []byte) { return nil }
-func (cond *validcondcutor) Validate() (valid bool)                        { return cond.valid && cond.echan != nil }
-func (cond *validcondcutor) Complete(properties Properties)                {}
+func TestAtomizer_Exec_Returner(t *testing.T) {
+
+	Clean()
+	defer Clean()
+
+	// Setup a cancellation context for the test so that it has a limited time
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	var tests []*tresult
+	for i := 0; i < 1000; i++ {
+		msg := randomdata.SillyName()
+
+		e, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
+
+		tests = append(tests, &tresult{
+			result:   msg,
+			electron: e,
+		})
+	}
+
+	if conductor, err := harness(ctx); err == nil {
+		var sent = time.Now()
+
+		wg := sync.WaitGroup{}
+
+		// Spawn electrons
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, test := range tests {
+
+				wg.Add(1)
+				go func(test *tresult) {
+					defer wg.Done()
+
+					// Send the electron onto the conductor
+					resp := conductor.Send(ctx, test.electron)
+
+					select {
+					case <-ctx.Done():
+						t.Error("context closed, test failed")
+						return
+					case result, ok := <-resp:
+						if ok {
+							if result.Error() == nil {
+
+								if len(result.Result()) > 0 {
+									res := string(result.Result())
+									if res == test.result {
+										t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID(), result.EndTime().Sub(result.StartTime()).String())
+									} else {
+										t.Errorf("%s != %s", test.result, res)
+									}
+								} else {
+									t.Error("results length is not 1")
+								}
+							} else {
+								t.Errorf("Error returned from atom: [%s]\n", result.Error())
+							}
+						} else {
+							t.Error("result channel closed, test failed")
+						}
+					}
+				}(test)
+			}
+		}()
+
+		wg.Wait()
+		t.Logf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
+
+	} else {
+		t.Error("error while executing harness")
+	}
+}
 
 // Tests the atomizer creation method without a conductor
 func TestAtomizeNoConductors(t *testing.T) {
@@ -38,7 +160,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 		{
 			"ValidTestValidConductor",
-			&validcondcutor{"ValidTestValidConductor", make(<-chan Electron), true},
+			&validcondcutor{"ValidTestValidConductor", make(<-chan []byte), true},
 			false,
 		},
 		{
@@ -60,12 +182,12 @@ func TestAtomizeNoConductors(t *testing.T) {
 
 	for _, test := range tests {
 		// Reset sync map for this test
-		registration.Clean()
+		Clean()
 
 		// Store the test conductor
 		if test.err || (!test.err && test.value != nil) {
 			// Store invalid conductor
-			registration.Register(test.key, test.value)
+			Register(nil, test.key, test.value)
 		}
 
 		mizer := Atomize(context.Background())
@@ -80,7 +202,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		}
 
 		// Cleanup sync map for additional tests
-		registration.Clean()
+		Clean()
 	}
 }
 
@@ -92,12 +214,12 @@ func TestAtomizer_AddConductor(t *testing.T) {
 	}{
 		{
 			"ValidTestEmptyConductor",
-			&validcondcutor{"ValidTestEmptyConductor", make(<-chan Electron), true},
+			&validcondcutor{"ValidTestEmptyConductor", make(<-chan []byte), true},
 			false,
 		},
 		{
 			"InvalidTestConductor",
-			&validcondcutor{"InvalidTestConductor", make(<-chan Electron), false},
+			&validcondcutor{"InvalidTestConductor", make(<-chan []byte), false},
 			true,
 		},
 		{
@@ -124,7 +246,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 
 	for _, test := range tests {
 		// Reset sync map for this test
-		registration.Clean()
+		Clean()
 
 		func() {
 			var ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
@@ -138,7 +260,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 					if validator.IsValid(mizer) {
 
 						// Add the conductor
-						if err = registration.Register(test.key, test.value); err == nil {
+						if err = Register(ctx, test.key, test.value); err == nil {
 
 							select {
 							case <-ctx.Done():
@@ -165,7 +287,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 		}()
 
 		// Cleanup sync map for additional tests
-		registration.Clean()
+		Clean()
 	}
 }
 
@@ -217,6 +339,74 @@ func TestAtomizer_Validate(t *testing.T) {
 		} else if test.err && ok {
 			t.Errorf("expected error for test [%s] but received success", test.key)
 		}
+	}
+}
+
+/********************************
+*
+*	BENCHMARKS
+*
+********************************/
+
+func BenchmarkAtomizer_Exec_Single(b *testing.B) {
+
+	Clean()
+	defer Clean()
+
+	// Setup a cancellation context for the test so that it has a limited time
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	if conductor, err := harness(ctx); err == nil {
+
+		// cleanup the benchmark timer to get correct measurements
+		b.ResetTimer()
+
+		for n := 0; n < b.N; n++ {
+			if e, err := newElectron("bench", nil); err == nil {
+
+				// Send the electron onto the conductor
+				resp := conductor.Send(ctx, e)
+
+				select {
+				case <-ctx.Done():
+					b.Error("context closed, test failed")
+					return
+				case result, ok := <-resp:
+					if ok {
+						fmt.Printf("Step [%v]\n", n)
+						if result.Error() != nil {
+							b.Errorf("Error returned from atom: [%s]\n", result.Error())
+						}
+					} else {
+						b.Error("result channel closed, test failed")
+					}
+				}
+
+				// // Send the electron onto the conductor
+				// resp := conductor.Send(ctx, e)
+
+				// select {
+				// case <-ctx.Done():
+				// 	b.Error("context closed, test failed")
+				// 	return
+				// case result, ok := <-resp:
+				// 	if ok {
+				// 		if result != nil && result.Error() == nil {
+				// 			// DO NOTHING
+				// 		} else {
+				// 			b.Error("invalid benchmark")
+				// 		}
+				// 	} else {
+				// 		b.Error("result channel closed, test failed")
+				// 	}
+				// }
+			} else {
+				b.Errorf("electron creation failure [%s]", err.Error())
+			}
+		}
+	} else {
+		b.Errorf("test harness failed [%s]", err.Error())
 	}
 }
 

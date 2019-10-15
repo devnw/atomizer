@@ -2,13 +2,15 @@ package atomizer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/benjivesterby/validator"
+	"github.com/pkg/errors"
 )
 
 type instance struct {
-	electron   Electron
+	electron   *ElectronBase
 	conductor  Conductor
 	atom       Atom
 	properties *properties
@@ -20,40 +22,54 @@ type instance struct {
 func (inst *instance) bond(atom Atom) (err error) {
 
 	if validator.IsValid(inst.electron) {
-
 		if validator.IsValid(inst.conductor) {
 
-			inst.atom = atom
-
-			if !validator.IsValid(inst.atom) {
-				// TODO:
+			// Ensure the atom passed in is valid
+			if validator.IsValid(atom) {
+				inst.atom = atom
+			} else {
+				err = errors.Errorf("invalid atom [%s] when attempting to bond", atom.ID())
 			}
 		} else {
-			// TODO:
+			err = errors.Errorf("invalid conductor [%v] when attempting to bond", inst.conductor.ID())
 		}
 	} else {
-		// TODO:
+		err = errors.Errorf("invalid electron [%s] when attempting to bond", inst.electron.ElectronID)
 	}
 
 	return err
 }
 
+// execute runs the process method on the bonded atom / electron pair
 func (inst *instance) execute(ctx context.Context) {
 
 	if validator.IsValid(inst) {
 
 		// Initialize the new context object for the processing of the electron/atom
-		if inst.electron.Timeout() != nil {
+		if inst.electron.Timeout != nil {
 			// Create a new context for the electron with a timeout
-			ctx, inst.cancel = context.WithTimeout(ctx, *inst.electron.Timeout())
+			ctx, inst.cancel = context.WithTimeout(ctx, *inst.electron.Timeout)
 		} else {
 			// Create a new context for the electron with a cancellation option
 			ctx, inst.cancel = context.WithCancel(ctx)
 		}
 
 		inst.properties = &properties{
-			status: PENDING,
+			electronID: inst.electron.ElectronID,
+			atomID:     inst.atom.ID(),
+			start:      time.Now(),
 		}
+
+		// Setup defer for this instance
+		defer func() {
+
+			// Set the end time and status in the properties
+			inst.properties.end = time.Now()
+
+			if err := inst.conductor.Complete(ctx, inst.properties); err != nil {
+				fmt.Println(err.Error())
+			}
+		}()
 
 		// TODO: Log the execution of the process method here
 		// TODO: build a properties object for this process here to store the results and errors into as they
@@ -61,51 +77,39 @@ func (inst *instance) execute(ctx context.Context) {
 		// stream in from the process method
 		// Execute the process method of the atom
 		var results <-chan []byte
-		var errstream <-chan error
-		results, errstream = inst.atom.Process(ctx, inst.electron, nil) // TODO: setup outbound
+		results = inst.atom.Process(ctx, inst.electron, nil) // TODO: setup outbound
 
-		// Update the status of the bonded atom/electron to show processing
-		// TODO: inst.properties.status = PROCESSING
-
-		// Continue looping while either of the channels is non-nil and open
-		for results != nil || errstream != nil {
-			select {
-			// Monitor the instance context for cancellation
-			case <-ctx.Done():
-				// TODO: mizer.sendLog(fmt.Sprintf("cancelling electron instance [%v] due to cancellation [%s]", ewrap.electron.ID(), instance.ctx.Err().Error()))
-			case result, ok := <-results:
-				// Append the results from the bonded instance for return through the properties
-				if ok {
-					inst.properties.AddResult(result)
-				} else {
-					// nil out the result channel after it's closed so that the loop breaks
-					result = nil
-				}
-			case err, ok := <-errstream:
-				// Append the errors from the bonded instance for return through the properties
-				if ok {
-					inst.properties.AddError(err)
-				} else {
-					// nil out the err channel after it's closed so that the loop breaks
-					errstream = nil
+		func() {
+			// Continue looping while either of the channels is non-nil and open
+			for results != nil {
+				select {
+				// Monitor the instance context for cancellation
+				case <-ctx.Done():
+					// TODO: mizer.sendLog(fmt.Sprintf("cancelling electron instance [%v] due to cancellation [%s]", ewrap.electron.ID(), instance.ctx.Err().Error()))
+					return
+				case result, ok := <-results:
+					if ok {
+						// Append the results from the bonded instance for return through the properties
+						inst.properties.result = result
+					}
+					return
 				}
 			}
-		}
+		}()
 
 		// TODO: The processing has finished for this bonded atom and the results need to be calculated and the properties sent back to the
 		// conductor
 
-		// Set the end time and status in the properties
-		inst.properties.end = time.Now()
-		inst.properties.status = COMPLETED
-
 		// TODO: Ensure mizer is the proper thing to do here?? I think it needs to close mizer out
 		//  at the conductor rather than here... unless the conductor overrode the call back
 
-		// TODO: Execute the callback with the noficiation here?
-
-		// TODO: Execute the electron callback here
-		inst.electron.Callback(inst.properties)
+		// TODO: Execute the callback with the notification here?
+		// TODO: determine if this is the correct location or if this is something that should be handled purely by the conductor
+		// TODO: Handle this properly
+		// if inst.electron.Resp != nil {
+		// 	// Drop the return for this electron onto the channel to be sent back to the requester
+		// 	inst.electron.Resp <- inst.properties
+		// }
 
 	} else {
 		// TODO: invalid

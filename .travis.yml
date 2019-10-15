@@ -1,4 +1,10 @@
 language: go
 
+go:
+  - 1.13.x
+
+env:
+  - GO111MODULE=on
+
 notifications:
   slack: uis-computerscience:WkbOOfv4FkpfUAs7UgxJPtx9

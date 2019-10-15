@@ -3,7 +3,6 @@ package atomizer
 import (
 	"context"
 
-	"github.com/benjivesterby/atomizer/registration"
 	"github.com/benjivesterby/validator"
 	"github.com/pkg/errors"
 )
@@ -14,7 +13,6 @@ type Atomizer interface {
 	Register(value interface{}) error
 	Errors(buffer int) (<-chan error, error)
 	Properties(buffer int) (<-chan Properties, error)
-	Validate() bool
 }
 
 // Atomize initialize instance of the atomizer to start reading from conductors and execute bonded electrons/atoms
@@ -39,7 +37,9 @@ func (mizer *atomizer) Exec() (err error) {
 		mizer.execSyncOnce.Do(func() {
 
 			// Start up the receivers
-			err = mizer.receive(registration.Registrations(mizer.ctx))
+			if err = mizer.receive(Registrations(mizer.ctx)); err == nil {
+				go mizer.distribute()
+			}
 
 			// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
 		})
@@ -53,11 +53,15 @@ func (mizer *atomizer) Exec() (err error) {
 // Register allows you to add additional type registrations to the atomizer (ie. Conductors and Atoms)
 func (mizer *atomizer) Register(value interface{}) (err error) {
 
-	// validate the automizer initialization itself
+	// validate the atomizer initialization itself
 	if validator.IsValid(mizer) {
 
 		// Pass the value on the registrations channel to be received
-		mizer.registrations <- value
+		select {
+		case <-mizer.ctx.Done():
+			return
+		case mizer.registrations <- value:
+		}
 	} else {
 		err = errors.New("invalid object to register")
 	}
@@ -70,7 +74,7 @@ func (mizer *atomizer) Register(value interface{}) (err error) {
 func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
 	var err error
 
-	// validate the automizer initialization itself
+	// validate the atomizer initialization itself
 	if validator.IsValid(mizer) {
 		if mizer.properties == nil {
 
@@ -93,7 +97,7 @@ func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
 func (mizer *atomizer) Errors(buffer int) (<-chan error, error) {
 	var err error
 
-	// validate the automizer initialization itself
+	// validate the atomizer initialization itself
 	if validator.IsValid(mizer) {
 		if mizer.errors == nil {
 
@@ -110,12 +114,4 @@ func (mizer *atomizer) Errors(buffer int) (<-chan error, error) {
 	}
 
 	return mizer.errors, err
-}
-
-// Validate verifies that this instance of the atomizer is correctly initialized. This imports the validator library
-// for extended use with the Validate method
-func (mizer *atomizer) Validate() (valid bool) {
-	valid = mizer.init() != nil
-
-	return valid
 }

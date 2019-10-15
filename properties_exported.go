@@ -6,21 +6,24 @@ import "time"
 // This should be returned to the sender over a properties channel
 type Properties interface {
 
+	// ElectronID returns the identifier of the Electron
+	ElectronID() string
+
+	// AtomID returns the identifier of the Atom
+	AtomID() string
+
 	// StartTime indicates the time the processing of an atom began (UTC)
-	StartTime() (start time.Time)
+	StartTime() time.Time
 
 	// EndTime indicates the time the processing of an atom ended (UTC)
-	EndTime() (end time.Time)
+	EndTime() time.Time
 
-	// ProcessingTime returns the duration of the process method on an atom for analysis by the calling system
-	ProcessingTime() (ptime time.Duration)
-
-	// Status is the status of the atom at the time the processing completed
-	Status() (status int)
+	// Duration returns the duration of the process method on an atom for analysis by the calling system
+	Duration() time.Duration
 
 	// Errors returns the list of errors that occurred on this atom after all the processing had been completed
-	Errors() (errors []error)
+	Error() error
 
-	// Results returns the list of results which are also byte slices
-	Results() (results [][]byte)
+	// Result returns the results of the processing
+	Result() []byte
 }

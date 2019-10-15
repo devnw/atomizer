@@ -1,12 +1,16 @@
-package registration
+package atomizer
 
 import (
 	"testing"
 )
 
-type testStruct struct{}
+type invalidTestStruct struct{}
 
 func TestRegister(t *testing.T) {
+
+	Clean()
+	defer Clean()
+
 	tests := []struct {
 		key   string
 		value interface{}
@@ -14,7 +18,7 @@ func TestRegister(t *testing.T) {
 	}{
 		{ // Valid test
 			"ValidTest",
-			&testStruct{},
+			&passthrough{input: make(chan []byte)},
 			false,
 		},
 		{ // Invalid test because value is nil
@@ -22,14 +26,17 @@ func TestRegister(t *testing.T) {
 			nil,
 			true,
 		},
+		{ // Invalid test because value is nil
+			"InvalidTypeTest",
+			invalidTestStruct{},
+			true,
+		},
 	}
 
-	Clean()
-
 	for _, test := range tests {
-		if err := Register(test.key, test.value); err == nil {
+		if err := Register(nil, test.key, test.value); err == nil {
 			if value, ok := preRegistrations.Load(test.key); ok {
-				if _, ok := value.(*testStruct); ok {
+				if _, ok := value.(*passthrough); ok {
 					if test.err {
 						t.Errorf("Test key [%s] failed because expected a failure but got success", test.key)
 					}
