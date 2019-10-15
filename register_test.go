@@ -7,6 +7,10 @@ import (
 type invalidTestStruct struct{}
 
 func TestRegister(t *testing.T) {
+
+	Clean()
+	defer Clean()
+
 	tests := []struct {
 		key   string
 		value interface{}
@@ -28,8 +32,6 @@ func TestRegister(t *testing.T) {
 			true,
 		},
 	}
-
-	Clean()
 
 	for _, test := range tests {
 		if err := Register(nil, test.key, test.value); err == nil {

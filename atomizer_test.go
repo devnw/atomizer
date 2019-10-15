@@ -11,9 +11,12 @@ import (
 	"github.com/benjivesterby/validator"
 )
 
+// TODO: Add result nil checks on conductor response
+
 func TestAtomizer_Exec(t *testing.T) {
 
 	Clean()
+	defer Clean()
 
 	// Setup a cancellation context for the test so that it has a limited time
 	var ctx, cancel = context.WithCancel(context.Background())
@@ -65,13 +68,12 @@ func TestAtomizer_Exec(t *testing.T) {
 	} else {
 
 	}
-
-	Clean()
 }
 
 func TestAtomizer_Exec_Returner(t *testing.T) {
 
 	Clean()
+	defer Clean()
 
 	// Setup a cancellation context for the test so that it has a limited time
 	var ctx, cancel = context.WithCancel(context.Background())
@@ -142,8 +144,6 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 	} else {
 		t.Error("error while executing harness")
 	}
-
-	Clean()
 }
 
 // Tests the atomizer creation method without a conductor
@@ -338,6 +338,112 @@ func TestAtomizer_Validate(t *testing.T) {
 			t.Errorf("expected success for test [%s] but received failure", test.key)
 		} else if test.err && ok {
 			t.Errorf("expected error for test [%s] but received success", test.key)
+		}
+	}
+}
+
+/********************************
+*
+*	BENCHMARKS
+*
+********************************/
+
+func BenchmarkAtomizer_Exec_Single(b *testing.B) {
+
+	Clean()
+	defer Clean()
+
+	// Setup a cancellation context for the test so that it has a limited time
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	if conductor, err := harness(ctx); err == nil {
+
+		// cleanup the benchmark timer to get correct measurements
+		b.ResetTimer()
+
+		for n := 0; n < b.N; n++ {
+			if e, err := newElectron("bench", nil); err == nil {
+
+				// Send the electron onto the conductor
+				resp := conductor.Send(ctx, e)
+
+				select {
+				case <-ctx.Done():
+					b.Error("context closed, test failed")
+					return
+				case result, ok := <-resp:
+					if ok {
+						fmt.Printf("Step [%v]\n", n)
+						if result.Error() != nil {
+							b.Errorf("Error returned from atom: [%s]\n", result.Error())
+						}
+					} else {
+						b.Error("result channel closed, test failed")
+					}
+				}
+
+				// // Send the electron onto the conductor
+				// resp := conductor.Send(ctx, e)
+
+				// select {
+				// case <-ctx.Done():
+				// 	b.Error("context closed, test failed")
+				// 	return
+				// case result, ok := <-resp:
+				// 	if ok {
+				// 		if result != nil && result.Error() == nil {
+				// 			// DO NOTHING
+				// 		} else {
+				// 			b.Error("invalid benchmark")
+				// 		}
+				// 	} else {
+				// 		b.Error("result channel closed, test failed")
+				// 	}
+				// }
+			} else {
+				b.Errorf("electron creation failure [%s]", err.Error())
+			}
+		}
+	} else {
+		b.Errorf("test harness failed [%s]", err.Error())
+	}
+}
+
+// Benchmarks the creation of an atomizer instance
+func BenchmarkAtomize(b *testing.B) {
+
+}
+
+// Benchmarks the cleanup of the atomizer given 1 electron
+func BenchmarkAtomizer_Exit1(b *testing.B) {
+
+}
+
+// Benchmarks the cleanup of the atomizer given 10 electrons
+func BenchmarkAtomizer_Exit10(b *testing.B) {
+
+}
+
+// Benchmarks the cleanup of the atomizer given 100 electrons
+func BenchmarkAtomizer_Exit100(b *testing.B) {
+
+}
+
+// Benchmarks the validation method of the atomizer
+func BenchmarkAtomizer_Validate(b *testing.B) {
+	var mizer = &atomizer{
+		electrons: make(chan instance),
+		bonded:    make(chan instance),
+		ctx:       context.Background(),
+		cancel: context.CancelFunc(func() {
+
+		}),
+	}
+
+	for n := 0; n < b.N; n++ {
+		if !validator.IsValid(mizer) {
+			b.Error("invalid atomizer, expected valid")
 		}
 	}
 }

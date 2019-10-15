@@ -83,6 +83,8 @@ func (pt *passthrough) Complete(ctx context.Context, properties Properties) (err
 		} else {
 			err = errors.Errorf("unable to load properties channel from sync map for electron [%s]", properties.ElectronID())
 		}
+	} else {
+		err = errors.Errorf("invalid properties returned for electron [%s]", properties.ElectronID())
 	}
 
 	return err
