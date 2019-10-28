@@ -2,76 +2,101 @@ package conductors
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"testing"
 
+	"github.com/benjivesterby/atomizer"
 	"github.com/streadway/amqp"
 )
 
 func TestReceiveMessage(t *testing.T) {
+	var err error
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	//What the string is supposed to be
 	ans := []byte("A test string")
 
-	fmt.Println("before addMessage")
+	if err = addMessage(t, string(ans)); err == nil {
 
-	addMessage(string(ans))
+		var c atomizer.Conductor
+		if c, err = Connect(DEFAULTADDRESS, "atomizer_topic", "#"); err == nil {
 
-	fmt.Println("after addMessage")
+			msgs := c.Receive(ctx)
 
-	topic := CreateTopicReceiver()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case msg, ok := <-msgs:
+					if ok {
 
-	topic.DeclareExchange("atomizer_topic")
-
-	topic.BindWithRoutingKey("#", "atomizer_topic")
-
-	chanMsgs := topic.Receive(context.Background())
-
-	for d := range chanMsgs {
-
-		if string(d) == string(ans) {
-			t.Errorf("Expected %v, got %v", "A test string", d)
-		} else {
-			fmt.Printf("Success")
+						if string(msg) == string(ans) {
+							t.Log("Success")
+						} else {
+							t.Errorf("Expected %v, got %v\n", string(ans), string(msg))
+						}
+					} else {
+						return
+					}
+				}
+			}
 		}
-
 	}
+
+	// topic := CreateTopicReceiver()
+
+	// topic.DeclareExchange("atomizer_topic")
+
+	// topic.BindWithRoutingKey("#", "atomizer_topic")
+
+	// for d := range chanMsgs {
+
+	// 	if string(d) == string(ans) {
+	// 		t.Errorf("Expected %v, got %v", "A test string", d)
+	// 	} else {
+	// 		fmt.Printf("Success")
+	// 	}
+
+	// }
 
 }
 
-func addMessage(message string) {
+func addMessage(t *testing.T, message string) (err error) {
 
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
-	failOnError(err, "Failed to connect to RabbitMQ")
-	defer conn.Close()
+	var conn *amqp.Connection
+	if conn, err = amqp.Dial(DEFAULTADDRESS); err == nil {
+		defer conn.Close()
 
-	ch, err := conn.Channel()
-	failOnError(err, "Failed to open a channel")
-	defer ch.Close()
+		var ch *amqp.Channel
+		if ch, err = conn.Channel(); err == nil {
+			defer ch.Close()
 
-	err = ch.ExchangeDeclare(
-		"atomizer_topic", // name
-		"topic",          // type
-		true,             // durable
-		false,            // auto-deleted
-		false,            // internal
-		false,            // no-wait
-		nil,              // arguments
-	)
+			if err = ch.ExchangeDeclare(
+				"atomizer_topic", // name
+				"topic",          // type
+				true,             // durable
+				false,            // auto-deleted
+				false,            // internal
+				false,            // no-wait
+				nil,              // arguments
+			); err == nil {
+				body := message
 
-	body := message
-	err = ch.Publish(
-		"atomizer_topic", // exchange
-		"isonomia",       // routing key
-		false,            // mandatory
-		false,            // immediate
-		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte(body),
-		})
-	failOnError(err, "Failed to publish a message")
+				if err = ch.Publish(
+					"atomizer_topic", // exchange
+					"isonomia",       // routing key
+					false,            // mandatory
+					false,            // immediate
+					amqp.Publishing{
+						ContentType: "text/plain",
+						Body:        []byte(body),
+					}); err == nil {
+					t.Logf("[x] Sent [%s]\n", body)
+				}
+			}
+		}
+	}
 
-	log.Printf(" [x] Sent %s", body)
-
+	return err
 }

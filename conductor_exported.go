@@ -17,6 +17,9 @@ type Conductor interface {
 
 	// Send sends electrons back out through the conductor for additional processing
 	Send(ctx context.Context, electron Electron) (result <-chan Properties)
+
+	// Close cleans up the conductor
+	Close()
 }
 
 // Send electron - Ionic

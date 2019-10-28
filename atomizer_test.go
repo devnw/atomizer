@@ -160,7 +160,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 		{
 			"ValidTestValidConductor",
-			&validcondcutor{"ValidTestValidConductor", make(<-chan []byte), true},
+			&validconductor{"ValidTestValidConductor", make(<-chan []byte), true},
 			false,
 		},
 		{
@@ -175,7 +175,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 		{
 			"InvalidTestInvalidElectronChan",
-			&validcondcutor{},
+			&validconductor{},
 			true,
 		},
 	}
@@ -214,17 +214,17 @@ func TestAtomizer_AddConductor(t *testing.T) {
 	}{
 		{
 			"ValidTestEmptyConductor",
-			&validcondcutor{"ValidTestEmptyConductor", make(<-chan []byte), true},
+			&validconductor{"ValidTestEmptyConductor", make(<-chan []byte), true},
 			false,
 		},
 		{
 			"InvalidTestConductor",
-			&validcondcutor{"InvalidTestConductor", make(<-chan []byte), false},
+			&validconductor{"InvalidTestConductor", make(<-chan []byte), false},
 			true,
 		},
 		{
 			"InvalidTestConductorNilElectron",
-			&validcondcutor{"InvalidTestConductorNilElectron", nil, true},
+			&validconductor{"InvalidTestConductorNilElectron", nil, true},
 			true,
 		},
 		{
@@ -234,12 +234,12 @@ func TestAtomizer_AddConductor(t *testing.T) {
 		},
 		{
 			"InvalidTestInvalidElectronChan",
-			&validcondcutor{},
+			&validconductor{},
 			true,
 		},
 		{ // Empty key test
 			"",
-			&validcondcutor{},
+			&validconductor{},
 			true,
 		},
 	}
