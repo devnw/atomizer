@@ -160,7 +160,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 		{
 			"ValidTestValidConductor",
-			&validcondcutor{"ValidTestValidConductor", make(<-chan []byte), true},
+			&validconductor{"ValidTestValidConductor", make(<-chan []byte), true},
 			false,
 		},
 		{
@@ -175,7 +175,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 		{
 			"InvalidTestInvalidElectronChan",
-			&validcondcutor{},
+			&validconductor{},
 			true,
 		},
 	}
@@ -214,17 +214,17 @@ func TestAtomizer_AddConductor(t *testing.T) {
 	}{
 		{
 			"ValidTestEmptyConductor",
-			&validcondcutor{"ValidTestEmptyConductor", make(<-chan []byte), true},
+			&validconductor{"ValidTestEmptyConductor", make(<-chan []byte), true},
 			false,
 		},
 		{
 			"InvalidTestConductor",
-			&validcondcutor{"InvalidTestConductor", make(<-chan []byte), false},
+			&validconductor{"InvalidTestConductor", make(<-chan []byte), false},
 			true,
 		},
 		{
 			"InvalidTestConductorNilElectron",
-			&validcondcutor{"InvalidTestConductorNilElectron", nil, true},
+			&validconductor{"InvalidTestConductorNilElectron", nil, true},
 			true,
 		},
 		{
@@ -234,12 +234,12 @@ func TestAtomizer_AddConductor(t *testing.T) {
 		},
 		{
 			"InvalidTestInvalidElectronChan",
-			&validcondcutor{},
+			&validconductor{},
 			true,
 		},
 		{ // Empty key test
 			"",
-			&validcondcutor{},
+			&validconductor{},
 			true,
 		},
 	}
@@ -252,37 +252,37 @@ func TestAtomizer_AddConductor(t *testing.T) {
 			var ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()
 
+			var err error
+
 			// Create an instance of the atomizer to test the add conductor with
 			mizer := Atomize(ctx)
-			if errs, err := mizer.Errors(0); err == nil {
-				if err = mizer.Exec(); err == nil {
+			errs := mizer.Errors(0)
 
-					if validator.IsValid(mizer) {
+			if err = mizer.Exec(); err == nil {
 
-						// Add the conductor
-						if err = Register(ctx, test.key, test.value); err == nil {
+				if validator.IsValid(mizer) {
 
-							select {
-							case <-ctx.Done():
-								// context for the atomizer was cancelled
-							case aerr, ok := <-errs:
-								if ok && aerr == nil && test.err {
-									t.Errorf("expected error for test [%s] but received success", test.key)
-								} else if ok && aerr != nil && !test.err {
-									t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
-								}
+					// Add the conductor
+					if err = Register(ctx, test.key, test.value); err == nil {
+
+						select {
+						case <-ctx.Done():
+							// context for the atomizer was cancelled
+						case aerr, ok := <-errs:
+							if ok && aerr == nil && test.err {
+								t.Errorf("expected error for test [%s] but received success", test.key)
+							} else if ok && aerr != nil && !test.err {
+								t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
 							}
-						} else if !test.err {
-							t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
 						}
-					} else {
-						t.Errorf("expected the atomizer to be valid but it was invalid for ALL tests")
+					} else if !test.err {
+						t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
 					}
 				} else {
-					t.Errorf("expected successful atomizer creation for test [%s] but received error while initializing atomizer [%s]", test.key, err.Error())
+					t.Errorf("expected the atomizer to be valid but it was invalid for ALL tests")
 				}
 			} else {
-				t.Errorf("error while getting the errors channel from the atomizer")
+				t.Errorf("expected successful atomizer creation for test [%s] but received error while initializing atomizer [%s]", test.key, err.Error())
 			}
 		}()
 

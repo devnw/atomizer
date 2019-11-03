@@ -3,7 +3,6 @@ package atomizer
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -40,7 +39,10 @@ type atomizer struct {
 	atomFanOut    map[string]chan<- instance
 	atomFanOutMut sync.RWMutex
 
-	errors     chan error
+	outputMutty sync.Mutex
+	events      chan string
+	errors      chan error
+
 	properties chan Properties
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -92,26 +94,40 @@ func (mizer *atomizer) init() *atomizer {
 }
 
 // If the error channel is not nil then send the error on the channel
-func (mizer *atomizer) sendErr(err error) {
+func (mizer *atomizer) error(err error) {
 	if validator.IsValid(mizer) {
 		if err != nil {
+			if mizer.errors != nil {
 
-			fmt.Println(err.Error())
-			// if mizer.errors != nil {
+				select {
+				case <-mizer.ctx.Done():
+					// Close the errors channel and return the context error to the requester
+					defer close(mizer.errors)
 
-			// 	select {
-			// 	case <-mizer.ctx.Done():
-
-			// 		// Close the errors channel and return the context error to the requester
-			// 		close(mizer.errors)
-			// 		err = mizer.ctx.Err()
-
-			// 	case mizer.errors <- err:
-			// 		// Sent the error on the channel
-			// 	}
-			// }
+				case mizer.errors <- err:
+				}
+			}
 		}
 
+	}
+}
+
+// If the event channel is not nil then send the event on the channel
+func (mizer *atomizer) event(event string) {
+	if len(event) > 0 {
+		if validator.IsValid(mizer) {
+			if mizer.events != nil {
+
+				select {
+				case <-mizer.ctx.Done():
+					// Close the events channel and return the context error to the requester
+					defer close(mizer.events)
+
+				case mizer.events <- event:
+					// Sent the error on the channel
+				}
+			}
+		}
 	}
 }
 
@@ -146,7 +162,7 @@ func (mizer *atomizer) receive(externalRegistations <-chan interface{}) (err err
 				case registration, ok := <-externalRegistations:
 					if ok {
 						if err := mizer.register(registration); err != nil {
-							mizer.sendErr(err)
+							mizer.error(err)
 						}
 					} else {
 						// channel closed
@@ -157,7 +173,7 @@ func (mizer *atomizer) receive(externalRegistations <-chan interface{}) (err err
 				case registration, ok := <-mizer.registrations:
 					if ok {
 						if err := mizer.register(registration); err != nil {
-							mizer.sendErr(err)
+							mizer.error(err)
 						}
 					} else {
 						// channel closed
@@ -230,11 +246,11 @@ func (mizer *atomizer) receiveConductor(conductor Conductor) (err error) {
 
 // Reading in from a specific electron channel of a conductor and drop it onto the atomizer channel for electrons
 func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
-	defer mizer.sendErr(handle(ctx, conductor, func() {
+	defer mizer.error(handle(ctx, conductor, func() {
 
 		// Self Heal - Re-place the conductor on the register channel for the atomizer
 		// to re-initialize so this stack can be garbage collected
-		mizer.sendErr(mizer.Register(conductor))
+		mizer.error(mizer.Register(conductor))
 	}))
 
 	// Read from the electron channel for mizer conductor and push onto the mizer electron channel for processing
@@ -275,7 +291,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 							result:     nil,
 						}
 
-						mizer.sendErr(errors.Errorf("invalid electron passed to atomizer [%v]", electron))
+						mizer.error(errors.Errorf("invalid electron passed to atomizer [%v]", electron))
 						conductor.Complete(ctx, props)
 					}
 
@@ -291,7 +307,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 					})
 				}
 			} else { // Channel is closed, break out of the loop
-				mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", conductor.ID()))
+				mizer.error(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", conductor.ID()))
 				return
 			}
 		}
@@ -339,7 +355,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 	if validator.IsValid(mizer) {
 
 		go func(ctx context.Context, atom Atom, electrons <-chan instance) {
-			defer mizer.sendErr(handle(ctx, atom, func() {
+			defer mizer.error(handle(ctx, atom, func() {
 
 				// remove the electron channel from the map of atoms so that it can be
 				// properly cleaned up before re-registering
@@ -349,7 +365,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 
 				// Self Heal - Re-place the atom on the register channel for the atomizer
 				// to re-initialize so this stack can be garbage collected
-				mizer.sendErr(mizer.Register(atom))
+				mizer.error(mizer.Register(atom))
 			}))
 
 			// Read from the electron channel for mizer conductor and push onto the mizer electron channel for processing
@@ -373,7 +389,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 
 						go mizer.exec(ctx, inst, newAtom)
 					} else { // Channel is closed, break out of the loop
-						mizer.sendErr(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", atom.ID()))
+						mizer.error(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", atom.ID()))
 						return
 					}
 				}
@@ -413,13 +429,13 @@ func (mizer *atomizer) exec(ctx context.Context, inst instance, newAtom reflect.
 				// Execute the instance after it's been picked up for monitoring
 				inst.execute(ctx)
 			} else {
-				mizer.sendErr(errors.Errorf("error while bonding atom [%s]: [%s]", a.ID(), err.Error()))
+				mizer.error(errors.Errorf("error while bonding atom [%s]: [%s]", a.ID(), err.Error()))
 			}
 		} else {
-			mizer.sendErr(errors.Errorf("invalid atom [%s]", a.ID()))
+			mizer.error(errors.Errorf("invalid atom [%s]", a.ID()))
 		}
 	} else {
-		mizer.sendErr(errors.Errorf("unable to type assert atom [%s] for electron id [%s]", inst.electron.AtomID, inst.electron.ID()))
+		mizer.error(errors.Errorf("unable to type assert atom [%s] for electron id [%s]", inst.electron.AtomID, inst.electron.ID()))
 	}
 }
 

@@ -20,31 +20,33 @@ type tresult struct {
 
 type invalidconductor struct{}
 
-type validcondcutor struct {
+type validconductor struct {
 	id    string
 	echan <-chan []byte
 	valid bool
 }
 
-func (cond *validcondcutor) ID() string {
+func (cond *validconductor) ID() string {
 	return cond.id
 }
 
-func (cond *validcondcutor) Receive(ctx context.Context) <-chan []byte {
+func (cond *validconductor) Receive(ctx context.Context) <-chan []byte {
 	return cond.echan
 }
 
-func (cond *validcondcutor) Send(ctx context.Context, electron Electron) (result <-chan Properties) {
+func (cond *validconductor) Send(ctx context.Context, electron Electron) (result <-chan Properties) {
 	return nil
 }
 
-func (cond *validcondcutor) Validate() (valid bool) {
+func (cond *validconductor) Validate() (valid bool) {
 	return cond.valid && cond.echan != nil
 }
 
-func (cond *validcondcutor) Complete(ctx context.Context, properties Properties) (err error) {
+func (cond *validconductor) Complete(ctx context.Context, properties Properties) (err error) {
 	return err
 }
+
+func (cond *validconductor) Close() {}
 
 // TODO: Move passthrough as a conductor implementation for in-node processing
 type passthrough struct {
@@ -124,6 +126,9 @@ func (pt *passthrough) Send(ctx context.Context, electron Electron) <-chan Prope
 	}
 
 	return result
+}
+
+func (pt *passthrough) Close() {
 }
 
 type printer struct{}
