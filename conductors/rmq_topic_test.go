@@ -17,10 +17,10 @@ func TestReceiveMessage(t *testing.T) {
 	//What the string is supposed to be
 	ans := []byte("A test string")
 
-	if err = addMessage(t, string(ans)); err == nil {
+	var c atomizer.Conductor
+	if c, err = Connect(DEFAULTADDRESS, "atomizer_topic", "iso"); err == nil {
 
-		var c atomizer.Conductor
-		if c, err = Connect(DEFAULTADDRESS, "atomizer_topic", "#"); err == nil {
+		if err = addMessage(t, string(ans)); err == nil {
 
 			msgs := c.Receive(ctx)
 
@@ -62,6 +62,8 @@ func TestReceiveMessage(t *testing.T) {
 
 }
 
+//Error could be from the connection getting closed after the functions exits
+//Exchange deleted
 func addMessage(t *testing.T, message string) (err error) {
 
 	var conn *amqp.Connection
@@ -85,12 +87,13 @@ func addMessage(t *testing.T, message string) (err error) {
 
 				if err = ch.Publish(
 					"atomizer_topic", // exchange
-					"isonomia",       // routing key
+					"iso",            // routing key
 					false,            // mandatory
 					false,            // immediate
 					amqp.Publishing{
-						ContentType: "text/plain",
-						Body:        []byte(body),
+						DeliveryMode: amqp.Persistent,
+						ContentType:  "text/plain",
+						Body:         []byte(body),
 					}); err == nil {
 					t.Logf("[x] Sent [%s]\n", body)
 				}
