@@ -11,8 +11,10 @@ import (
 type Atomizer interface {
 	Exec() error
 	Register(value interface{}) error
-	Errors(buffer int) (<-chan error, error)
+	Events(buffer int) <-chan string
+	Errors(buffer int) <-chan error
 	Properties(buffer int) (<-chan Properties, error)
+	Wait()
 }
 
 // Atomize initialize instance of the atomizer to start reading from conductors and execute bonded electrons/atoms
@@ -36,8 +38,12 @@ func (mizer *atomizer) Exec() (err error) {
 		// Execute on the atomizer should only ever be run once
 		mizer.execSyncOnce.Do(func() {
 
+			mizer.event("pulling conductor and atom registrations")
+
 			// Start up the receivers
 			if err = mizer.receive(Registrations(mizer.ctx)); err == nil {
+
+				mizer.event("setting up atom distribution channels")
 				go mizer.distribute()
 			}
 
@@ -94,24 +100,45 @@ func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
 }
 
 // Errors creates a channel to receive errors from the atomizer and return the channel for logging purposes
-func (mizer *atomizer) Errors(buffer int) (<-chan error, error) {
-	var err error
+func (mizer *atomizer) Errors(buffer int) <-chan error {
+	mizer.outputMutty.Lock()
+	defer mizer.outputMutty.Unlock()
 
-	// validate the atomizer initialization itself
-	if validator.IsValid(mizer) {
-		if mizer.errors == nil {
+	if mizer.errors == nil {
 
-			// Ensure that a proper buffer size was passed for the channel
-			if buffer < 0 {
-				buffer = 0
-			}
-
-			// Only upon request should the error channel be established meaning a user should read from the channel
-			mizer.errors = make(chan error, buffer)
+		// Ensure that a proper buffer size was passed for the channel
+		if buffer < 0 {
+			buffer = 0
 		}
-	} else {
-		err = errors.New("invalid atomizer")
+
+		// Only upon request should the error channel be established meaning a user should read from the channel
+		mizer.errors = make(chan error, buffer)
 	}
 
-	return mizer.errors, err
+	return mizer.errors
+}
+
+// Events creates a channel to receive events from the atomizer and return the channel for logging purposes
+func (mizer *atomizer) Events(buffer int) <-chan string {
+	mizer.outputMutty.Lock()
+	defer mizer.outputMutty.Unlock()
+
+	if mizer.events == nil {
+
+		// Ensure that a proper buffer size was passed for the channel
+		if buffer < 0 {
+			buffer = 0
+		}
+
+		// Only upon request should the event channel be established meaning a user should read from the channel
+		mizer.events = make(chan string, buffer)
+	}
+
+	return mizer.events
+}
+
+// Wait blocks on the context done channel to allow for the executable
+// to block for the atomizer to finish processing
+func (mizer *atomizer) Wait() {
+	<-mizer.ctx.Done()
 }
