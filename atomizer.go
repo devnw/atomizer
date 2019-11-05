@@ -3,6 +3,7 @@ package atomizer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -253,6 +254,9 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 		mizer.error(mizer.Register(conductor))
 	}))
 
+	mizer.event(fmt.Sprintf("conductor [%s] initialized", conductor.ID()))
+	receiver := conductor.Receive(ctx)
+
 	// Read from the electron channel for mizer conductor and push onto the mizer electron channel for processing
 	for {
 
@@ -265,11 +269,15 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 			// TODO: Error here?
 			// mizer.sendErr(errors.Errorf("context closed for distribution of conductor [%v]; exiting [%s]", conductor.ID(), ctx.Err().Error()))
 			return
-		case e, ok := <-conductor.Receive(ctx):
+		case e, ok := <-receiver:
 			if ok {
+
+				mizer.event("marshalling incoming electron")
 
 				var electron = &ElectronBase{}
 				if err := json.Unmarshal(e, electron); err == nil {
+
+					mizer.event(fmt.Sprintf("electron [%s] received", electron.ElectronID))
 
 					// Ensure that the electron being received is valid
 					if validator.IsValid(electron) {
@@ -296,6 +304,8 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 					}
 
 				} else {
+					mizer.error(errors.Errorf("unable to parse electron [%s]", string(e)))
+
 					// TODO: Error parsing the electron, return an error back to the conductor
 					conductor.Complete(ctx, &properties{
 						electronID: "unable to parse",

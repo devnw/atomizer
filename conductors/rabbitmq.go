@@ -3,7 +3,9 @@ package conductors
 import (
 	"context"
 
+	"github.com/benjivesterby/alog"
 	"github.com/benjivesterby/atomizer"
+	"github.com/google/uuid"
 	"github.com/streadway/amqp"
 )
 
@@ -26,12 +28,12 @@ func Connect(connectionstring, exchange, route string) (atomizer.Conductor, erro
 			if mq.channel, err = mq.conn.Channel(); err == nil {
 
 				if mq.queue, err = mq.channel.QueueDeclare(
-					"",    // name
-					false, // durable
-					false, // delete when unused
-					true,  // exclusive
-					false, // no-wait
-					nil,   // arguments
+					uuid.New().String(), // name
+					false,               // durable
+					false,               // delete when unused
+					true,                // exclusive
+					false,               // no-wait
+					nil,                 // arguments
 				); err == nil {
 
 					if err = mq.channel.ExchangeDeclare(
@@ -52,7 +54,7 @@ func Connect(connectionstring, exchange, route string) (atomizer.Conductor, erro
 							false, //noWait -- TODO: see would this argument does
 							nil,   //args
 						); err == nil {
-
+							// TODO:
 						}
 					}
 				}
@@ -89,16 +91,19 @@ func (r *rabbitmq) Receive(ctx context.Context) <-chan []byte {
 		nil,          // args
 	); err == nil {
 		go func(in <-chan amqp.Delivery, out chan<- []byte) {
-			defer close(out)
 
-			select {
-			case <-ctx.Done():
-				return
-			case msg, ok := <-in:
-				if ok {
-					out <- msg.Body
-				} else {
+			for {
+				select {
+				case <-ctx.Done():
+					defer close(out)
 					return
+				case msg, ok := <-in:
+					if ok {
+						alog.Println("pushing inbound message to consumer")
+						out <- msg.Body
+					} else {
+						return
+					}
 				}
 			}
 
