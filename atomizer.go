@@ -33,7 +33,7 @@ type atomizer struct {
 	// and is used to create atom workers for bonding purposes
 	atoms chan Atom
 
-	throttle sampler
+	throttle *sampler
 
 	// This sync.Map contains the channels for handling each of the bondings for the
 	// different atoms registered in the system
@@ -67,7 +67,14 @@ func (mizer *atomizer) init() *atomizer {
 		return nil
 	default:
 
-		//TODO: Initialize throttle sampler type here
+		// Initialize throttle sampler type here
+		if mizer.throttle == nil {
+			mizer.throttle = &sampler{
+				ctx:     mizer.ctx,
+				process: make(chan bool),
+				once:    &sync.Once{},
+			}
+		}
 
 		// Initialize the electrons channel
 		if mizer.electrons == nil {
@@ -209,7 +216,7 @@ func (mizer *atomizer) register(registration interface{}) (err error) {
 			case Atom:
 				err = mizer.receiveAtom(v)
 			default:
-				// TODO: error here because the type is unknown
+				// TODO: error here because the type is u nknown
 			}
 		} else {
 			err = errors.Errorf("invalid [%v] passed to regsiter", reflect.TypeOf(registration))
@@ -260,8 +267,8 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 	// Read from the electron channel for mizer conductor and push onto the mizer electron channel for processing
 	for {
 
-		// TODO: sampler throttle here
-		// mizer.throttle.Wait()
+		// Sampler throttle here
+		mizer.throttle.Wait()
 
 		select {
 		case <-ctx.Done():
