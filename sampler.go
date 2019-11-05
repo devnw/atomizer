@@ -2,9 +2,10 @@ package atomizer
 
 import (
 	"context"
-	"github.com/shirou/gopsutil/mem"
 	"sync"
 	"time"
+
+	"github.com/shirou/gopsutil/mem"
 )
 
 // Reads in system resource information to determine if there is
@@ -14,31 +15,35 @@ import (
 type sampler struct {
 	process chan bool
 	once    *sync.Once
+	ctx     context.Context
 }
 
 func (sampl sampler) sample() {
-	v, _ := mem.VirtualMemory()
-	usedMem := v.UsedPercent
-
-	if usedMem >= 70.00 {
-		//establishes to wait if the used memory percentage is at a set amount
-	} else {
-		//what am I returning here to the instance?
-	}
+	go func() {
+		for {
+			select {
+			case <-sampl.ctx.Done():
+				return
+			default:
+				if v, err := mem.VirtualMemory(); err == nil {
+					if v.UsedPercent <= 70.00 {
+						//establishes to wait if the used memory percentage is at a set amount
+						select {
+						case <-sampl.ctx.Done():
+							return
+						case sampl.process <- true:
+						}
+					}
+				}
+				<-time.After(5 * time.Millisecond)
+			}
+		}
+	}()
 
 }
 
-func (sampl sampler) Wait(ctx context.Context) {
+func (sampl sampler) Wait() {
 	sampl.once.Do(sampl.sample)
-	// Only wait if the process channel has been initialized
-	if sampl.process != nil {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(5 * time.Second):
-			sampl.sample()
-		}
-		// Block on the channel
-		<-sampl.process
-	}
+	// Block on the channel
+	<-sampl.process
 }
