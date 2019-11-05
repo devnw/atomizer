@@ -65,7 +65,7 @@ func (mizer *atomizer) init() *atomizer {
 	case <-mizer.ctx.Done():
 		return nil
 	default:
-
+		
 		//TODO: Initialize throttle sampler type here
 
 		// Initialize the electrons channel
@@ -208,7 +208,7 @@ func (mizer *atomizer) register(registration interface{}) (err error) {
 			case Atom:
 				err = mizer.receiveAtom(v)
 			default:
-				// TODO: error here because the type is unknown
+				// TODO: error here because the type is u nknown
 			}
 		} else {
 			err = errors.Errorf("invalid [%v] passed to regsiter", reflect.TypeOf(registration))
@@ -490,3 +490,4 @@ func (mizer *atomizer) distribute() {
 		// TODO:
 	}
 }
+
