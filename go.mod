@@ -4,8 +4,8 @@ go 1.13
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
-	github.com/benjivesterby/alog v0.0.0-20191103230246-c26997614429
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
+	github.com/benjivesterby/alog v0.0.0-20191103230246-c26997614429
 	github.com/benjivesterby/validator v1.0.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-ole/go-ole v1.2.4 // indirect
