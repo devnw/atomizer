@@ -16,10 +16,15 @@ type sampler struct {
 	process chan bool
 	once    *sync.Once
 	ctx     context.Context
+	cancel  context.CancelFunc
 }
 
 func (sampl sampler) sample() {
+
 	go func() {
+
+		var subctx context.Context
+
 		for {
 			select {
 			case <-sampl.ctx.Done():
@@ -27,11 +32,23 @@ func (sampl sampler) sample() {
 			default:
 				if v, err := mem.VirtualMemory(); err == nil {
 					if v.UsedPercent <= 70.00 {
+						// reset the sub context so the timeout goes away
+						subctx = nil
+
 						//establishes to wait if the used memory percentage is at a set amount
 						select {
 						case <-sampl.ctx.Done():
 							return
 						case sampl.process <- true:
+						}
+					} else {
+						if subctx == nil {
+							//subctx, _ = context.WithTimeout(sampl.ctx, time.Second*15)
+						}
+
+						select {
+						case <-subctx.Done():
+							panic("sampler timed out without processing for x minutes")
 						}
 					}
 				}

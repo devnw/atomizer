@@ -254,12 +254,15 @@ func (mizer *atomizer) receiveConductor(conductor Conductor) (err error) {
 
 // Reading in from a specific electron channel of a conductor and drop it onto the atomizer channel for electrons
 func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
-	defer mizer.error(handle(ctx, conductor, func() {
+	// defer mizer.error(handle(ctx, conductor, func() {
 
-		// Self Heal - Re-place the conductor on the register channel for the atomizer
-		// to re-initialize so this stack can be garbage collected
-		mizer.error(mizer.Register(conductor))
-	}))
+	// 	// TODO: HANDLE the sampler panic differently here so that it properly crashes
+	// 	// the atomizer
+
+	// 	// Self Heal - Re-place the conductor on the register channel for the atomizer
+	// 	// to re-initialize so this stack can be garbage collected
+	// 	mizer.error(mizer.Register(conductor))
+	// }))
 
 	mizer.event(fmt.Sprintf("conductor [%s] initialized", conductor.ID()))
 	receiver := conductor.Receive(ctx)
