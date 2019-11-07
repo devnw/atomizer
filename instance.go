@@ -71,6 +71,8 @@ func (inst *instance) execute(ctx context.Context) {
 			}
 		}()
 
+		fmt.Printf("executing electron [%s]\n", inst.electron.ElectronID)
+
 		// TODO: Log the execution of the process method here
 		// TODO: build a properties object for this process here to store the results and errors into as they
 		// TODO: Setup with a heartbeat for monitoring processing of the bonded atom
@@ -78,6 +80,8 @@ func (inst *instance) execute(ctx context.Context) {
 		// Execute the process method of the atom
 		var results <-chan []byte
 		results = inst.atom.Process(ctx, inst.electron, nil) // TODO: setup outbound
+
+		fmt.Printf("electron [%s] processed\n", inst.electron.ElectronID)
 
 		func() {
 			// Continue looping while either of the channels is non-nil and open

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/benjivesterby/alog"
 	"github.com/benjivesterby/validator"
 	"github.com/pkg/errors"
 )
@@ -41,11 +42,14 @@ func Registrations(ctx context.Context) <-chan interface{} {
 			preRegistrations.Range(func(key, value interface{}) bool {
 				var ok bool
 
+				alog.Printf("pushing pre-registration %v", key)
+
 				// Pass the value over the channel
 				select {
 				case <-ctx.Done():
 					close(regchan)
 				case regchan <- value:
+					alog.Printf("deleting pre-registration key %v", key)
 
 					// Delete the key from the map to indicate that it's been received
 					preRegistrations.Delete(key)

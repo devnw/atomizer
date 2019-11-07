@@ -43,7 +43,9 @@ func (mizer *atomizer) Exec() (err error) {
 			// Start up the receivers
 			if err = mizer.receive(Registrations(mizer.ctx)); err == nil {
 
-				mizer.event("setting up atom distribution channels")
+				// Setup the distribution loop for incoming electrons
+				// so that they can be properly fanned out to the atom
+				// receivers
 				go mizer.distribute()
 			}
 

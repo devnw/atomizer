@@ -43,7 +43,9 @@ func (sampl sampler) sample() {
 						}
 					} else {
 						if subctx == nil {
-							//subctx, _ = context.WithTimeout(sampl.ctx, time.Second*15)
+							var cancel context.CancelFunc
+							subctx, cancel = context.WithTimeout(sampl.ctx, time.Second*15)
+							defer cancel()
 						}
 
 						select {

@@ -212,11 +212,14 @@ func (mizer *atomizer) register(registration interface{}) (err error) {
 			// Switch over the registration type
 			switch v := registration.(type) {
 			case Conductor:
+				mizer.event(fmt.Sprintf("receiving conductor [%s]", v.ID()))
 				err = mizer.receiveConductor(v)
 			case Atom:
+				mizer.event(fmt.Sprintf("receiving atom [%s]", v.ID()))
 				err = mizer.receiveAtom(v)
 			default:
-				// TODO: error here because the type is u nknown
+				// error here because the type is unknown
+				err = errors.Errorf("unknown registration type [%v]", reflect.TypeOf(registration))
 			}
 		} else {
 			err = errors.Errorf("invalid [%v] passed to regsiter", reflect.TypeOf(registration))
@@ -287,16 +290,17 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 				var electron = &ElectronBase{}
 				if err := json.Unmarshal(e, electron); err == nil {
 
-					mizer.event(fmt.Sprintf("electron [%s] received", electron.ElectronID))
-
 					// Ensure that the electron being received is valid
 					if validator.IsValid(electron) {
+
+						mizer.event(fmt.Sprintf("electron [%s] received", electron.ElectronID))
 
 						// Send the electron down the electrons channel to be processed
 						select {
 						case <-mizer.ctx.Done():
 							return
 						case mizer.electrons <- instance{electron, conductor, nil, nil, nil}:
+							mizer.event(fmt.Sprintf("electron instance [%s] pushed to distribution", electron.ElectronID))
 						}
 					} else {
 
@@ -314,7 +318,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 					}
 
 				} else {
-					mizer.error(errors.Errorf("unable to parse electron [%s]", string(e)))
+					mizer.error(errors.Errorf("unable to parse electron [%s] | error: [%s]", string(e), err))
 
 					// TODO: Error parsing the electron, return an error back to the conductor
 					conductor.Complete(ctx, &properties{
@@ -344,23 +348,24 @@ func (mizer *atomizer) receiveAtom(atom Atom) (err error) {
 			var electrons chan<- instance
 			// setup atom receiver
 			if electrons, err = mizer.split(mizer.ctx, atom); err == nil {
+				mizer.event(fmt.Sprintf("splitting atom [%s]", atom.ID()))
 
 				if electrons != nil {
 
 					// Register the atom into the atomizer for receiving electrons
 					mizer.atomFanOutMut.Lock()
+					mizer.event(fmt.Sprintf("registering electron channel for atom [%s]", atom.ID()))
 					mizer.atomFanOut[atom.ID()] = electrons
 					mizer.atomFanOutMut.Unlock()
 				} else {
-					// TODO: Error
+					err = errors.Errorf("atom [%s] returned nil electron channel post split", atom.ID())
 				}
 			} else {
-				// TODO:
+				err = errors.Errorf("error splitting atom [%v] | %s", atom.ID(), err.Error())
 			}
 		} else {
-			err = errors.Errorf("invalid conductor [%v] set to be received", atom.ID())
+			err = errors.Errorf("invalid atom [%v] to be split", atom.ID())
 		}
-
 	} else {
 		err = errors.New("invalid atomizer")
 	}
@@ -399,6 +404,8 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 				case inst, ok := <-electrons:
 					if ok {
 
+						mizer.event(fmt.Sprintf("creating new instance of electron [%s]", inst.electron.ElectronID))
+
 						// TODO: implement the processing push
 						// TODO: after the processing has started push to instances channel for monitoring by the
 						// sampler so that this second can focus on starting additional instances rather than on
@@ -406,6 +413,8 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 
 						// Initialize a new copy of the atom
 						newAtom := reflect.New(reflect.TypeOf(atom).Elem())
+
+						mizer.event(fmt.Sprintf("new instance of electron [%s] created", inst.electron.ElectronID))
 
 						go mizer.exec(ctx, inst, newAtom)
 					} else { // Channel is closed, break out of the loop
@@ -431,6 +440,8 @@ func (mizer *atomizer) exec(ctx context.Context, inst instance, newAtom reflect.
 	// being accidentally used in this section
 	if a, ok := newAtom.Interface().(Atom); ok {
 		if validator.IsValid(a) {
+
+			mizer.event(fmt.Sprintf("bonding electron [%s]", inst.electron.ElectronID))
 
 			// bond the new atom instantiation to the electron instance
 			if err = inst.bond(a); err == nil {
@@ -461,11 +472,9 @@ func (mizer *atomizer) exec(ctx context.Context, inst instance, newAtom reflect.
 
 func (mizer *atomizer) distribute() {
 	// TODO: defer
+	defer close(mizer.electrons)
 
-	// Only re-create the channel in the event that it's nil
-	if mizer.electrons == nil {
-		mizer.electrons = make(chan instance)
-	}
+	mizer.event("setting up atom distribution channels")
 
 	if validator.IsValid(mizer) {
 		for {
@@ -475,38 +484,39 @@ func (mizer *atomizer) distribute() {
 			case ewrap, ok := <-mizer.electrons:
 				if ok {
 
+					mizer.event(fmt.Sprintf("electron [%s] set for distribution to atom [%s]", ewrap.electron.ElectronID, ewrap.electron.AtomID))
 					// TODO: how would this call be tracked going forward as part of a go routine? What if this blocks forever?
-					go func() {
-						// TODO: Handle the panic here in the event that the channel is closed and return the electron to the channel
+					// TODO: Handle the panic here in the event that the channel is closed and return the electron to the channel
 
-						if validator.IsValid(ewrap) {
-							var achan chan<- instance
+					if validator.IsValid(ewrap) {
+						var achan chan<- instance
 
-							mizer.atomFanOutMut.RLock()
-							achan = mizer.atomFanOut[ewrap.electron.AtomID]
-							mizer.atomFanOutMut.RUnlock()
+						mizer.atomFanOutMut.RLock()
+						achan = mizer.atomFanOut[ewrap.electron.AtomID]
+						mizer.atomFanOutMut.RUnlock()
 
-							// Pass the electron to the correct atom channel if it is not nil
-							if achan != nil {
-								select {
-								case <-mizer.ctx.Done():
-									return
-								case achan <- ewrap:
-								}
-							} else {
-								// TODO:
+						// Pass the electron to the correct atom channel if it is not nil
+						if achan != nil {
+							select {
+							case <-mizer.ctx.Done():
+								return
+							case achan <- ewrap:
 							}
 						} else {
-							// TODO:
+							mizer.error(errors.Errorf("atom [%s] channel for receiving electrons is nil", ewrap.electron.AtomID))
 						}
-					}()
+					} else {
+						mizer.error(errors.Errorf("invalid electron wrapper for atom [%s]", ewrap.electron.AtomID))
+					}
 				} else {
 					// TODO: panic here because atomizer can't work without electron distribution
+					mizer.error(errors.New("electron distribution channel closed"))
+					defer mizer.cancel()
 					return
 				}
 			}
 		}
 	} else {
-		// TODO:
+		mizer.error(errors.New("invalid atomizer instance"))
 	}
 }
