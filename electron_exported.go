@@ -18,6 +18,8 @@ type Electron interface {
 	// Respond returns the response channel for the properties that this electron
 	// returns after processing
 	Respond() chan<- Properties
+
+	// TODO: add timeout for expected result return
 }
 
 // ElectronBase is the base electron that MUST parse from the payload from the conductor

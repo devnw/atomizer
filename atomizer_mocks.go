@@ -34,7 +34,7 @@ func (cond *validconductor) Receive(ctx context.Context) <-chan []byte {
 	return cond.echan
 }
 
-func (cond *validconductor) Send(ctx context.Context, electron Electron) (result <-chan Properties) {
+func (cond *validconductor) Send(ctx context.Context, electron Electron) (result <-chan *Properties) {
 	return nil
 }
 
@@ -42,7 +42,7 @@ func (cond *validconductor) Validate() (valid bool) {
 	return cond.valid && cond.echan != nil
 }
 
-func (cond *validconductor) Complete(ctx context.Context, properties Properties) (err error) {
+func (cond *validconductor) Complete(ctx context.Context, properties *Properties) (err error) {
 	return err
 }
 
@@ -62,12 +62,12 @@ func (pt *passthrough) Receive(ctx context.Context) <-chan []byte {
 
 func (pt *passthrough) Validate() (valid bool) { return pt.input != nil }
 
-func (pt *passthrough) Complete(ctx context.Context, properties Properties) (err error) {
+func (pt *passthrough) Complete(ctx context.Context, properties *Properties) (err error) {
 	if validator.IsValid(properties) {
 		// for rabbit mq drop properties onto the /basepath/electronid message path
-		if value, ok := pt.results.Load(properties.ElectronID()); ok {
+		if value, ok := pt.results.Load(properties.ElectronID); ok {
 			if value != nil {
-				if resultChan, ok := value.(chan Properties); ok {
+				if resultChan, ok := value.(chan *Properties); ok {
 					defer close(resultChan)
 
 					// Push the properties of the instance onto the channel
@@ -80,23 +80,23 @@ func (pt *passthrough) Complete(ctx context.Context, properties Properties) (err
 					err = errors.New("unable to type assert electron properties channel")
 				}
 			} else {
-				err = errors.Errorf("nil properties channel returned for electron [%s]", properties.ElectronID())
+				err = errors.Errorf("nil properties channel returned for electron [%s]", properties.ElectronID)
 			}
 		} else {
-			err = errors.Errorf("unable to load properties channel from sync map for electron [%s]", properties.ElectronID())
+			err = errors.Errorf("unable to load properties channel from sync map for electron [%s]", properties.ElectronID)
 		}
 	} else {
-		err = errors.Errorf("invalid properties returned for electron [%s]", properties.ElectronID())
+		err = errors.Errorf("invalid properties returned for electron [%s]", properties.ElectronID)
 	}
 
 	return err
 }
 
-func (pt *passthrough) Send(ctx context.Context, electron Electron) <-chan Properties {
-	result := make(chan Properties)
+func (pt *passthrough) Send(ctx context.Context, electron Electron) <-chan *Properties {
+	result := make(chan *Properties)
 
 	if validator.IsValid(electron) {
-		go func(result chan Properties) {
+		go func(result chan *Properties) {
 
 			var e []byte
 			var err error
@@ -116,8 +116,8 @@ func (pt *passthrough) Send(ctx context.Context, electron Electron) <-chan Prope
 					}
 				} else {
 					defer close(result)
-					p := &properties{}
-					p.err = errors.Errorf("duplicate electron registration for EID [%s]", electron.ID())
+					p := &Properties{}
+					p.Error = errors.Errorf("duplicate electron registration for EID [%s]", electron.ID())
 
 					result <- p
 				}

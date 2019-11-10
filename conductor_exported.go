@@ -13,10 +13,10 @@ type Conductor interface {
 	Receive(ctx context.Context) <-chan []byte
 
 	// Complete mark the completion of an electron instance with applicable statistics
-	Complete(ctx context.Context, properties Properties) error
+	Complete(ctx context.Context, properties *Properties) error
 
 	// Send sends electrons back out through the conductor for additional processing
-	Send(ctx context.Context, electron Electron) (result <-chan Properties)
+	Send(ctx context.Context, electron Electron) (result <-chan *Properties)
 
 	// Close cleans up the conductor
 	Close()

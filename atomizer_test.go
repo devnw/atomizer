@@ -43,12 +43,12 @@ func TestAtomizer_Exec(t *testing.T) {
 			return
 		case result, ok := <-resp:
 			if ok {
-				if result.Error() == nil {
+				if result.Error == nil {
 
-					if len(result.Result()) > 0 {
-						res := string(result.Result())
+					if len(result.Result) > 0 {
+						res := string(result.Result)
 						if res == test.result {
-							t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID(), result.EndTime().Sub(result.StartTime()).String())
+							t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID, result.End.Sub(result.Start).String())
 						} else {
 							t.Errorf("%s != %s", test.result, res)
 						}
@@ -56,7 +56,7 @@ func TestAtomizer_Exec(t *testing.T) {
 						t.Error("results length is not 1")
 					}
 				} else {
-					t.Errorf("Error returned from atom: [%s]\n", result.Error())
+					t.Errorf("Error returned from atom: [%s]\n", result.Error)
 				}
 			} else {
 				t.Error("result channel closed, test failed")
@@ -115,12 +115,12 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 						return
 					case result, ok := <-resp:
 						if ok {
-							if result.Error() == nil {
+							if result.Error == nil {
 
-								if len(result.Result()) > 0 {
-									res := string(result.Result())
+								if len(result.Result) > 0 {
+									res := string(result.Result)
 									if res == test.result {
-										t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID(), result.EndTime().Sub(result.StartTime()).String())
+										t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID, result.End.Sub(result.Start).String())
 									} else {
 										t.Errorf("%s != %s", test.result, res)
 									}
@@ -128,7 +128,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 									t.Error("results length is not 1")
 								}
 							} else {
-								t.Errorf("Error returned from atom: [%s]\n", result.Error())
+								t.Errorf("Error returned from atom: [%s]\n", result.Error)
 							}
 						} else {
 							t.Error("result channel closed, test failed")
@@ -375,8 +375,8 @@ func BenchmarkAtomizer_Exec_Single(b *testing.B) {
 				case result, ok := <-resp:
 					if ok {
 						fmt.Printf("Step [%v]\n", n)
-						if result.Error() != nil {
-							b.Errorf("Error returned from atom: [%s]\n", result.Error())
+						if result.Error != nil {
+							b.Errorf("Error returned from atom: [%s]\n", result.Error)
 						}
 					} else {
 						b.Error("result channel closed, test failed")

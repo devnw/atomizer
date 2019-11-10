@@ -2,9 +2,9 @@ package atomizer
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"github.com/benjivesterby/alog"
 	"github.com/benjivesterby/validator"
 	"github.com/pkg/errors"
 )
@@ -13,7 +13,7 @@ type instance struct {
 	electron   *ElectronBase
 	conductor  Conductor
 	atom       Atom
-	properties *properties
+	properties *Properties
 	cancel     context.CancelFunc
 
 	// TODO: add an actions channel here that the monitor can keep an eye on for this bonded electron/atom combo
@@ -54,24 +54,26 @@ func (inst *instance) execute(ctx context.Context) {
 			ctx, inst.cancel = context.WithCancel(ctx)
 		}
 
-		inst.properties = &properties{
-			electronID: inst.electron.ElectronID,
-			atomID:     inst.atom.ID(),
-			start:      time.Now(),
+		inst.properties = &Properties{
+			ElectronID: inst.electron.ElectronID,
+			AtomID:     inst.atom.ID(),
+			Start:      time.Now(),
 		}
 
 		// Setup defer for this instance
 		defer func() {
 
 			// Set the end time and status in the properties
-			inst.properties.end = time.Now()
+			inst.properties.End = time.Now()
 
-			if err := inst.conductor.Complete(ctx, inst.properties); err != nil {
-				fmt.Println(err.Error())
+			if err := inst.conductor.Complete(ctx, inst.properties); err == nil {
+				alog.Printf("completed electron [%s]\n", inst.electron.ElectronID)
+			} else {
+				alog.Errorf(err, "error marking electron [%s] as complete", inst.electron.ElectronID)
 			}
 		}()
 
-		fmt.Printf("executing electron [%s]\n", inst.electron.ElectronID)
+		alog.Printf("executing electron [%s]\n", inst.electron.ElectronID)
 
 		// TODO: Log the execution of the process method here
 		// TODO: build a properties object for this process here to store the results and errors into as they
@@ -81,7 +83,7 @@ func (inst *instance) execute(ctx context.Context) {
 		var results <-chan []byte
 		results = inst.atom.Process(ctx, inst.electron, nil) // TODO: setup outbound
 
-		fmt.Printf("electron [%s] processed\n", inst.electron.ElectronID)
+		alog.Printf("electron [%s] processed\n", inst.electron.ElectronID)
 
 		func() {
 			// Continue looping while either of the channels is non-nil and open
@@ -94,7 +96,7 @@ func (inst *instance) execute(ctx context.Context) {
 				case result, ok := <-results:
 					if ok {
 						// Append the results from the bonded instance for return through the properties
-						inst.properties.result = result
+						inst.properties.Result = result
 					}
 					return
 				}
@@ -120,7 +122,7 @@ func (inst *instance) execute(ctx context.Context) {
 	}
 }
 
-func (inst *instance) Properties() Properties {
+func (inst *instance) Properties() *Properties {
 	return inst.properties
 }
 
