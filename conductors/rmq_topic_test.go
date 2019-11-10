@@ -18,7 +18,7 @@ func TestReceiveMessage(t *testing.T) {
 	ans := []byte("A test string")
 
 	var c atomizer.Conductor
-	if c, err = Connect(DEFAULTADDRESS, "atomizer_topic", "iso"); err == nil {
+	if c, err = Connect(DEFAULTADDRESS, "atomizer_topic"); err == nil {
 
 		if err = addMessage(t, string(ans)); err == nil {
 
@@ -76,7 +76,7 @@ func addMessage(t *testing.T, message string) (err error) {
 
 			if err = ch.ExchangeDeclare(
 				"atomizer_topic", // name
-				"topic",          // type
+				"fanout",         // type
 				true,             // durable
 				false,            // auto-deleted
 				false,            // internal
@@ -87,7 +87,7 @@ func addMessage(t *testing.T, message string) (err error) {
 
 				if err = ch.Publish(
 					"atomizer_topic", // exchange
-					"iso",            // routing key
+					"",               // routing key
 					false,            // mandatory
 					false,            // immediate
 					amqp.Publishing{

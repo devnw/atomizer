@@ -1,5 +1,9 @@
 package conductors
 
+import (
+	"context"
+)
+
 func init() {
-	// Register the conductor for the atomizer
+	Register(context.Background(), "rabbit", &rabbitmq{})
 }
