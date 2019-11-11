@@ -25,7 +25,7 @@ func TestAtomizer_Exec(t *testing.T) {
 	if conductor, err := harness(ctx); err == nil {
 
 		msg := randomdata.SillyName()
-		e, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
+		e, r, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
 		test := &tresult{
 			result:   msg,
 			electron: e,
@@ -34,39 +34,41 @@ func TestAtomizer_Exec(t *testing.T) {
 		var sent = time.Now()
 
 		// Send the electron onto the conductor
-		resp := conductor.Send(ctx, test.electron)
+		if err = conductor.Send(ctx, test.electron); err == nil {
 
-		// Block until a result is returned from the instance
-		select {
-		case <-ctx.Done():
-			t.Error("context closed, test failed")
-			return
-		case result, ok := <-resp:
-			if ok {
-				if result.Error == nil {
+			// Block until a result is returned from the instance
+			select {
+			case <-ctx.Done():
+				t.Error("context closed, test failed")
+				return
+			case result, ok := <-r:
+				if ok {
+					if result.Error == nil {
 
-					if len(result.Result) > 0 {
-						res := string(result.Result)
-						if res == test.result {
-							t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID, result.End.Sub(result.Start).String())
+						if len(result.Result) > 0 {
+							res := string(result.Result)
+							if res == test.result {
+								t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID, result.End.Sub(result.Start).String())
+							} else {
+								t.Errorf("%s != %s", test.result, res)
+							}
 						} else {
-							t.Errorf("%s != %s", test.result, res)
+							t.Error("results length is not 1")
 						}
 					} else {
-						t.Error("results length is not 1")
+						t.Errorf("Error returned from atom: [%s]\n", result.Error)
 					}
 				} else {
-					t.Errorf("Error returned from atom: [%s]\n", result.Error)
+					t.Error("result channel closed, test failed")
 				}
-			} else {
-				t.Error("result channel closed, test failed")
 			}
+
+			t.Logf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
+		} else {
+			// TODO:
 		}
-
-		t.Logf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
-
 	} else {
-
+		// TODO:
 	}
 }
 
@@ -83,11 +85,12 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		msg := randomdata.SillyName()
 
-		e, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
+		e, r, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
 
 		tests = append(tests, &tresult{
 			result:   msg,
 			electron: e,
+			res:      r,
 		})
 	}
 
@@ -107,31 +110,32 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 					defer wg.Done()
 
 					// Send the electron onto the conductor
-					resp := conductor.Send(ctx, test.electron)
+					if err = conductor.Send(ctx, test.electron); err == nil {
 
-					select {
-					case <-ctx.Done():
-						t.Error("context closed, test failed")
-						return
-					case result, ok := <-resp:
-						if ok {
-							if result.Error == nil {
+						select {
+						case <-ctx.Done():
+							t.Error("context closed, test failed")
+							return
+						case result, ok := <-test.res:
+							if ok {
+								if result.Error == nil {
 
-								if len(result.Result) > 0 {
-									res := string(result.Result)
-									if res == test.result {
-										t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID, result.End.Sub(result.Start).String())
+									if len(result.Result) > 0 {
+										res := string(result.Result)
+										if res == test.result {
+											t.Logf("EID [%s] | Time [%s] - MATCH", result.ElectronID, result.End.Sub(result.Start).String())
+										} else {
+											t.Errorf("%s != %s", test.result, res)
+										}
 									} else {
-										t.Errorf("%s != %s", test.result, res)
+										t.Error("results length is not 1")
 									}
 								} else {
-									t.Error("results length is not 1")
+									t.Errorf("Error returned from atom: [%s]\n", result.Error)
 								}
 							} else {
-								t.Errorf("Error returned from atom: [%s]\n", result.Error)
+								t.Error("result channel closed, test failed")
 							}
-						} else {
-							t.Error("result channel closed, test failed")
 						}
 					}
 				}(test)
@@ -363,44 +367,45 @@ func BenchmarkAtomizer_Exec_Single(b *testing.B) {
 		b.ResetTimer()
 
 		for n := 0; n < b.N; n++ {
-			if e, err := newElectron("bench", nil); err == nil {
+			if e, r, err := newElectron("bench", nil); err == nil {
 
 				// Send the electron onto the conductor
-				resp := conductor.Send(ctx, e)
+				if err = conductor.Send(ctx, e); err == nil {
 
-				select {
-				case <-ctx.Done():
-					b.Error("context closed, test failed")
-					return
-				case result, ok := <-resp:
-					if ok {
-						fmt.Printf("Step [%v]\n", n)
-						if result.Error != nil {
-							b.Errorf("Error returned from atom: [%s]\n", result.Error)
+					select {
+					case <-ctx.Done():
+						b.Error("context closed, test failed")
+						return
+					case result, ok := <-r:
+						if ok {
+							fmt.Printf("Step [%v]\n", n)
+							if result.Error != nil {
+								b.Errorf("Error returned from atom: [%s]\n", result.Error)
+							}
+						} else {
+							b.Error("result channel closed, test failed")
 						}
-					} else {
-						b.Error("result channel closed, test failed")
 					}
+
+					// // Send the electron onto the conductor
+					// resp := conductor.Send(ctx, e)
+
+					// select {
+					// case <-ctx.Done():
+					// 	b.Error("context closed, test failed")
+					// 	return
+					// case result, ok := <-resp:
+					// 	if ok {
+					// 		if result != nil && result.Error() == nil {
+					// 			// DO NOTHING
+					// 		} else {
+					// 			b.Error("invalid benchmark")
+					// 		}
+					// 	} else {
+					// 		b.Error("result channel closed, test failed")
+					// 	}
+					// }
 				}
-
-				// // Send the electron onto the conductor
-				// resp := conductor.Send(ctx, e)
-
-				// select {
-				// case <-ctx.Done():
-				// 	b.Error("context closed, test failed")
-				// 	return
-				// case result, ok := <-resp:
-				// 	if ok {
-				// 		if result != nil && result.Error() == nil {
-				// 			// DO NOTHING
-				// 		} else {
-				// 			b.Error("invalid benchmark")
-				// 		}
-				// 	} else {
-				// 		b.Error("result channel closed, test failed")
-				// 	}
-				// }
 			} else {
 				b.Errorf("electron creation failure [%s]", err.Error())
 			}

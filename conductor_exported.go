@@ -16,7 +16,7 @@ type Conductor interface {
 	Complete(ctx context.Context, properties *Properties) error
 
 	// Send sends electrons back out through the conductor for additional processing
-	Send(ctx context.Context, electron Electron) (result <-chan *Properties)
+	Send(ctx context.Context, electron Electron) error
 
 	// Close cleans up the conductor
 	Close()

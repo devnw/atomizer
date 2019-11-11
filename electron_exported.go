@@ -17,7 +17,7 @@ type Electron interface {
 
 	// Respond returns the response channel for the properties that this electron
 	// returns after processing
-	Respond() chan<- Properties
+	Respond() chan<- *Properties
 
 	// TODO: add timeout for expected result return
 }
@@ -44,7 +44,7 @@ type ElectronBase struct {
 	// Resp is the channel that returns messages from this spawned
 	// instance of the electron. The channel allows for blocking and if
 	// the channel is nil it will be ignored and no responses will be returned
-	Resp chan Properties `json:"-"`
+	Resp chan<- *Properties `json:"-"`
 }
 
 // ID returns the identifier for this electron
@@ -59,7 +59,7 @@ func (e *ElectronBase) Payload() []byte {
 
 // Respond returns the response channel for the properties that this electron
 // returns after processing
-func (e *ElectronBase) Respond() chan<- Properties {
+func (e *ElectronBase) Respond() chan<- *Properties {
 	return e.Resp
 }
 

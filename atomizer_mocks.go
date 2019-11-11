@@ -14,6 +14,7 @@ import (
 type tresult struct {
 	result   string
 	electron *ElectronBase
+	res      chan *Properties
 	err      bool
 	panic    bool
 }
@@ -34,8 +35,8 @@ func (cond *validconductor) Receive(ctx context.Context) <-chan []byte {
 	return cond.echan
 }
 
-func (cond *validconductor) Send(ctx context.Context, electron Electron) (result <-chan *Properties) {
-	return nil
+func (cond *validconductor) Send(ctx context.Context, electron Electron) (err error) {
+	return err
 }
 
 func (cond *validconductor) Validate() (valid bool) {
@@ -92,7 +93,7 @@ func (pt *passthrough) Complete(ctx context.Context, properties *Properties) (er
 	return err
 }
 
-func (pt *passthrough) Send(ctx context.Context, electron Electron) <-chan *Properties {
+func (pt *passthrough) Send(ctx context.Context, electron Electron) (err error) {
 	result := make(chan *Properties)
 
 	if validator.IsValid(electron) {
@@ -125,7 +126,7 @@ func (pt *passthrough) Send(ctx context.Context, electron Electron) <-chan *Prop
 		}(result)
 	}
 
-	return result
+	return err
 }
 
 func (pt *passthrough) Close() {
@@ -185,18 +186,19 @@ type printerdata struct {
 	Message string `json:"message"`
 }
 
-func newElectron(atomID string, payload []byte) (electron *ElectronBase, err error) {
+func newElectron(atomID string, payload []byte) (electron *ElectronBase, res chan (*Properties), err error) {
 
 	id := uuid.New()
+	res = make(chan *Properties)
 
 	electron = &ElectronBase{
 		ElectronID: id.String(),
 		AtomID:     atomID,
 		Load:       payload,
-		Resp:       make(chan Properties),
+		Resp:       res,
 	}
 
-	return electron, err
+	return electron, res, err
 }
 
 // harness creates a valid atomizer that uses the passthrough conductor

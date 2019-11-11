@@ -6,7 +6,6 @@ import (
 
 	"github.com/benjivesterby/alog"
 	"github.com/benjivesterby/atomizer"
-	"github.com/benjivesterby/validator"
 	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
 )
@@ -18,9 +17,9 @@ const (
 
 // Connect uses the connection string that is passed in to initialize
 // the rabbitmq conductor
-func Connect(connectionstring, iqueue, rqueue string) (atomizer.Conductor, error) {
+func Connect(connectionstring, aqueue, resultex string) (atomizer.Conductor, error) {
 	var err error
-	mq := &rabbitmq{iqueue: iqueue, rqueue: rqueue}
+	mq := &rabbitmq{aqueue: aqueue, resultex: resultex}
 
 	if len(connectionstring) > 0 {
 		// TODO: Add additional validation here for formatting later
@@ -29,10 +28,10 @@ func Connect(connectionstring, iqueue, rqueue string) (atomizer.Conductor, error
 		if mq.conn, err = amqp.Dial(connectionstring); err == nil {
 
 			// Create the inbound processing exchanges and queues
-			if mq.channel, err = mq.conn.Channel(); err == nil {
+			if mq.atoms, err = mq.conn.Channel(); err == nil {
 
-				if mq.queue, err = mq.channel.QueueDeclare(
-					iqueue, // name
+				if _, err = mq.atoms.QueueDeclare(
+					aqueue, // name
 					true,   // durable
 					false,  // delete when unused
 					false,  // exclusive
@@ -40,27 +39,6 @@ func Connect(connectionstring, iqueue, rqueue string) (atomizer.Conductor, error
 					nil,    // arguments
 				); err == nil {
 
-					// if err = mq.channel.ExchangeDeclare(
-					// 	iqueue,   // name
-					// 	"direct", // type
-					// 	true,     // durable
-					// 	false,    // auto-deleted
-					// 	false,    // internal
-					// 	false,    // no-wait
-					// 	nil,      // arguments
-
-					// ); err == nil {
-
-					// 	if err = mq.channel.QueueBind(
-					// 		mq.queue.Name,
-					// 		"",
-					// 		iqueue,
-					// 		false, //noWait -- TODO: see would this argument does
-					// 		nil,   //args
-					// 	); err == nil {
-
-					// 	}
-					// }
 				}
 			}
 
@@ -75,12 +53,11 @@ type rabbitmq struct {
 	conn *amqp.Connection
 
 	// Incoming Requests
-	iqueue  string
-	channel *amqp.Channel
-	queue   amqp.Queue
+	aqueue string
+	atoms  *amqp.Channel
 
 	// Finished results
-	rqueue string
+	resultex string
 }
 
 func (r *rabbitmq) ID() string {
@@ -93,15 +70,15 @@ func (r *rabbitmq) Receive(ctx context.Context) <-chan []byte {
 	var out = make(chan []byte)
 
 	// Prefetch variables
-	if err = r.channel.Qos(
+	if err = r.atoms.Qos(
 		1,     // prefetch count
 		0,     // prefetch size
 		false, // global
 	); err == nil {
 
-		if in, err = r.channel.Consume(
+		if in, err = r.atoms.Consume(
 
-			r.iqueue, // Queue
+			r.aqueue, // Queue
 			"",       // consumer
 			true,     // auto ack
 			false,    // exclusive
@@ -143,20 +120,20 @@ func (r *rabbitmq) Complete(ctx context.Context, properties *atomizer.Properties
 		defer ch.Close()
 
 		if err = ch.ExchangeDeclare(
-			r.rqueue, // name
-			"topic",  // type
-			true,     // durable
-			false,    // auto-deleted
-			false,    // internal
-			false,    // no-wait
-			nil,      // arguments
+			r.resultex, // name
+			"topic",    // type
+			true,       // durable
+			false,      // auto-deleted
+			false,      // internal
+			false,      // no-wait
+			nil,        // arguments
 
 		); err == nil {
 			var result []byte
 			if result, err = json.Marshal(properties); err == nil {
 
 				if err = ch.Publish(
-					r.rqueue,              // exchange
+					r.resultex,            // exchange
 					properties.ElectronID, // routing key
 					false,                 // mandatory
 					false,                 // immediate
@@ -174,36 +151,28 @@ func (r *rabbitmq) Complete(ctx context.Context, properties *atomizer.Properties
 	return err
 }
 
-func (r *rabbitmq) Send(ctx context.Context, electron atomizer.Electron) <-chan *atomizer.Properties {
+func (r *rabbitmq) Send(ctx context.Context, electron atomizer.Electron) (err error) {
+	var e []byte
 
-	//TODO: need exchange name for UI
+	if e, err = json.Marshal(electron); err == nil {
 
-	result := make(chan *atomizer.Properties)
+		if err = r.atoms.Publish(
+			"",       // exchange
+			r.aqueue, // routing key
+			false,    // mandatory
+			false,    // immediate
+			amqp.Publishing{
+				DeliveryMode: amqp.Persistent,
+				ContentType:  "application/json",
+				Body:         e, //Send the electron's properties
+			}); err == nil {
+			alog.Printf("sent electron [%s] for processing\n", electron.ID())
 
-	if validator.IsValid(electron) {
+			respond := electron.Respond()
+			if respond != nil {
 
-		// TODO: setup a timeout for the electron context
-
-		go func(ctx context.Context, result chan<- *atomizer.Properties) {
-			defer close(result) // clean up the result channel
-
-			var e []byte
-			var err error
-
-			if e, err = json.Marshal(electron); err == nil {
-
-				if err = r.channel.Publish(
-					"",       // exchange
-					r.iqueue, // routing key
-					false,    // mandatory
-					false,    // immediate
-					amqp.Publishing{
-						DeliveryMode: amqp.Persistent,
-						ContentType:  "application/json",
-						Body:         e, //Send the electron's properties
-					}); err == nil {
-					alog.Printf("Sent Electron [%s] for processing\n", string(e))
-
+				// TODO: Add in timeout here
+				go func(respond chan<- *atomizer.Properties) {
 					var res []byte
 					if res, err = r.listen(ctx, electron.ID()); err == nil {
 						p := &atomizer.Properties{}
@@ -211,17 +180,17 @@ func (r *rabbitmq) Send(ctx context.Context, electron atomizer.Electron) <-chan 
 							select {
 							case <-ctx.Done():
 								return
-							case result <- p:
-								alog.Printf("Sent Electron [%s] for processing\n", string(e))
+							case respond <- p:
+								alog.Printf("sent electron [%s] result for completion\n", electron.ID())
 							}
 						}
 					}
-				}
+				}(respond)
 			}
-		}(ctx, result)
+		}
 	}
 
-	return result
+	return err
 }
 
 func (r *rabbitmq) listen(ctx context.Context, electronid string) (results []byte, err error) {
@@ -231,13 +200,13 @@ func (r *rabbitmq) listen(ctx context.Context, electronid string) (results []byt
 		defer ch.Close()
 
 		if err = ch.ExchangeDeclare(
-			r.rqueue, // name
-			"topic",  // type
-			true,     // durable
-			false,    // auto-deleted
-			false,    // internal
-			false,    // no-wait
-			nil,      // arguments
+			r.resultex, // name
+			"topic",    // type
+			true,       // durable
+			false,      // auto-deleted
+			false,      // internal
+			false,      // no-wait
+			nil,        // arguments
 
 		); err == nil {
 
@@ -254,7 +223,7 @@ func (r *rabbitmq) listen(ctx context.Context, electronid string) (results []byt
 				if err = ch.QueueBind(
 					q.Name,
 					electronid,
-					r.rqueue,
+					r.resultex,
 					false, //noWait -- TODO: see would this argument does
 					nil,   //args
 				); err == nil {
@@ -274,6 +243,7 @@ func (r *rabbitmq) listen(ctx context.Context, electronid string) (results []byt
 							return nil, nil
 						case res, ok := <-msgs:
 							if ok {
+								alog.Printf("received result for electron [%s]\n", electronid)
 								results = res.Body
 							} else {
 								return nil, errors.New("channel closed without result")
@@ -290,6 +260,6 @@ func (r *rabbitmq) listen(ctx context.Context, electronid string) (results []byt
 
 func (r *rabbitmq) Close() {
 	// TODO: set these up to be async, and sync.Once
-	r.channel.Close()
+	r.atoms.Close()
 	r.conn.Close()
 }

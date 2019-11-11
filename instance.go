@@ -81,7 +81,7 @@ func (inst *instance) execute(ctx context.Context) {
 		// stream in from the process method
 		// Execute the process method of the atom
 		var results <-chan []byte
-		results = inst.atom.Process(ctx, inst.electron, nil) // TODO: setup outbound
+		results = inst.atom.Process(ctx, inst.electron, inst.outbound(ctx))
 
 		alog.Printf("electron [%s] processed\n", inst.electron.ElectronID)
 
@@ -120,6 +120,31 @@ func (inst *instance) execute(ctx context.Context) {
 	} else {
 		// TODO: invalid
 	}
+}
+
+func (inst *instance) outbound(ctx context.Context) chan<- Electron {
+	electrons := make(chan Electron)
+
+	go func(electrons chan Electron) {
+		defer close(electrons)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case e, ok := <-electrons:
+				if ok {
+					// Push the electron to the conductor
+					inst.conductor.Send(ctx, e)
+				} else {
+					return
+				}
+			}
+		}
+
+	}(electrons)
+
+	return electrons
 }
 
 func (inst *instance) Properties() *Properties {
