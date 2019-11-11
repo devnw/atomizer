@@ -109,8 +109,8 @@ func (mizer *atomizer) error(err error) {
 
 				select {
 				case <-mizer.ctx.Done():
-					// Close the errors channel and return the context error to the requester
 					defer close(mizer.errors)
+					return
 
 				case mizer.errors <- err:
 				}
@@ -128,8 +128,8 @@ func (mizer *atomizer) event(event string) {
 
 				select {
 				case <-mizer.ctx.Done():
-					// Close the events channel and return the context error to the requester
 					defer close(mizer.events)
+					return
 
 				case mizer.events <- event:
 					// Sent the error on the channel

@@ -25,23 +25,23 @@ func TestAtomizer_Exec(t *testing.T) {
 	if conductor, err := harness(ctx); err == nil {
 
 		msg := randomdata.SillyName()
-		e, r, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
+		e, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
 		test := &tresult{
 			result:   msg,
 			electron: e,
 		}
 
 		var sent = time.Now()
-
+		var result <-chan *Properties
 		// Send the electron onto the conductor
-		if err = conductor.Send(ctx, test.electron); err == nil {
+		if result, err = conductor.Send(ctx, test.electron); err == nil {
 
 			// Block until a result is returned from the instance
 			select {
 			case <-ctx.Done():
 				t.Error("context closed, test failed")
 				return
-			case result, ok := <-r:
+			case result, ok := <-result:
 				if ok {
 					if result.Error == nil {
 
@@ -82,15 +82,14 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 	defer cancel()
 
 	var tests []*tresult
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 50; i++ {
 		msg := randomdata.SillyName()
 
-		e, r, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
+		e, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
 
 		tests = append(tests, &tresult{
 			result:   msg,
 			electron: e,
-			res:      r,
 		})
 	}
 
@@ -109,14 +108,15 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 				go func(test *tresult) {
 					defer wg.Done()
 
+					var result <-chan *Properties
 					// Send the electron onto the conductor
-					if err = conductor.Send(ctx, test.electron); err == nil {
+					if result, err = conductor.Send(ctx, test.electron); err == nil {
 
 						select {
 						case <-ctx.Done():
 							t.Error("context closed, test failed")
 							return
-						case result, ok := <-test.res:
+						case result, ok := <-result:
 							if ok {
 								if result.Error == nil {
 
@@ -146,7 +146,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 		t.Logf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
 
 	} else {
-		t.Error("error while executing harness")
+		t.Errorf("error while executing harness | %s", err)
 	}
 }
 
@@ -367,16 +367,16 @@ func BenchmarkAtomizer_Exec_Single(b *testing.B) {
 		b.ResetTimer()
 
 		for n := 0; n < b.N; n++ {
-			if e, r, err := newElectron("bench", nil); err == nil {
-
+			if e, err := newElectron("bench", nil); err == nil {
+				var result <-chan *Properties
 				// Send the electron onto the conductor
-				if err = conductor.Send(ctx, e); err == nil {
+				if result, err = conductor.Send(ctx, e); err == nil {
 
 					select {
 					case <-ctx.Done():
 						b.Error("context closed, test failed")
 						return
-					case result, ok := <-r:
+					case result, ok := <-result:
 						if ok {
 							fmt.Printf("Step [%v]\n", n)
 							if result.Error != nil {

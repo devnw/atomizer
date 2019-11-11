@@ -142,7 +142,7 @@ func (r *rabbitmq) Complete(ctx context.Context, properties *atomizer.Properties
 						Body:        result,
 					}); err == nil {
 
-					alog.Printf("Electron [%s] complete, pushed results to conductor\n", properties.ElectronID)
+					alog.Printf("electron [%s] complete, pushed results to conductor\n", properties.ElectronID)
 				}
 			}
 		}
@@ -151,8 +151,10 @@ func (r *rabbitmq) Complete(ctx context.Context, properties *atomizer.Properties
 	return err
 }
 
-func (r *rabbitmq) Send(ctx context.Context, electron atomizer.Electron) (err error) {
+func (r *rabbitmq) Send(ctx context.Context, electron atomizer.Electron) (<-chan *atomizer.Properties, error) {
 	var e []byte
+	var err error
+	respond := make(chan *atomizer.Properties)
 
 	if e, err = json.Marshal(electron); err == nil {
 
@@ -168,29 +170,48 @@ func (r *rabbitmq) Send(ctx context.Context, electron atomizer.Electron) (err er
 			}); err == nil {
 			alog.Printf("sent electron [%s] for processing\n", electron.ID())
 
-			respond := electron.Respond()
-			if respond != nil {
+			// TODO: Add in timeout here
+			go func(ctx context.Context, respond chan<- *atomizer.Properties) {
+				var err error
+				// ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+				// defer cancel()
+				defer func(err error) {
 
-				// TODO: Add in timeout here
-				go func(respond chan<- *atomizer.Properties) {
-					var res []byte
-					if res, err = r.listen(ctx, electron.ID()); err == nil {
-						p := &atomizer.Properties{}
-						if err = json.Unmarshal(res, p); err == nil {
-							select {
-							case <-ctx.Done():
-								return
-							case respond <- p:
-								alog.Printf("sent electron [%s] result for completion\n", electron.ID())
-							}
+					if err != nil {
+
+						alog.Warnln(err, nil)
+
+						// Send failure property as response
+						select {
+						case respond <- &atomizer.Properties{
+							ElectronID: electron.ID(),
+							AtomID:     electron.AID(),
+							Error:      err,
+						}:
 						}
 					}
-				}(respond)
-			}
+
+					close(respond)
+				}(err)
+
+				var res []byte
+				if res, err = r.listen(ctx, electron.ID()); err == nil {
+					p := &atomizer.Properties{}
+					if err = json.Unmarshal(res, p); err == nil {
+						select {
+						case <-ctx.Done():
+							err = errors.Errorf("context cancelled for electron [%s]; timeout exceeded", electron.ID())
+							return
+						case respond <- p:
+							alog.Printf("sent electron [%s] result for completion\n", electron.ID())
+						}
+					}
+				}
+			}(ctx, respond)
 		}
 	}
 
-	return err
+	return respond, err
 }
 
 func (r *rabbitmq) listen(ctx context.Context, electronid string) (results []byte, err error) {

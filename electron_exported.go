@@ -15,9 +15,8 @@ type Electron interface {
 	// Payload returns the Raw Json Payload that was passed from the conductor
 	Payload() []byte
 
-	// Respond returns the response channel for the properties that this electron
-	// returns after processing
-	Respond() chan<- *Properties
+	// AID returns the atom id of this electron
+	AID() string
 
 	// TODO: add timeout for expected result return
 }
@@ -40,11 +39,6 @@ type ElectronBase struct {
 	// the json for the actual atom instance. RawMessage is used to delay unmarshal
 	// of the payload information so the atom can do it internally
 	Load json.RawMessage `json:"payload"`
-
-	// Resp is the channel that returns messages from this spawned
-	// instance of the electron. The channel allows for blocking and if
-	// the channel is nil it will be ignored and no responses will be returned
-	Resp chan<- *Properties `json:"-"`
 }
 
 // ID returns the identifier for this electron
@@ -52,15 +46,14 @@ func (e *ElectronBase) ID() string {
 	return e.ElectronID
 }
 
+// AID returns the Atom Identifier of this electron
+func (e *ElectronBase) AID() string {
+	return e.AtomID
+}
+
 // Payload returns the Raw Json Payload that was passed from the conductor
 func (e *ElectronBase) Payload() []byte {
 	return []byte(e.Load)
-}
-
-// Respond returns the response channel for the properties that this electron
-// returns after processing
-func (e *ElectronBase) Respond() chan<- *Properties {
-	return e.Resp
 }
 
 // Validate ensures that the electron information is intact for proper execution

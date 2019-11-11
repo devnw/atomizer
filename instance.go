@@ -62,6 +62,14 @@ func (inst *instance) execute(ctx context.Context) {
 
 		// Setup defer for this instance
 		defer func() {
+			if r := recover(); r != nil {
+				inst.properties.Error = errors.Errorf(
+					"panic in processing of electron [%s] | panic: [%s] | error:[%s]",
+					inst.electron.ElectronID,
+					r,
+					inst.properties.Error,
+				)
+			}
 
 			// Set the end time and status in the properties
 			inst.properties.End = time.Now()
@@ -75,33 +83,11 @@ func (inst *instance) execute(ctx context.Context) {
 
 		alog.Printf("executing electron [%s]\n", inst.electron.ElectronID)
 
-		// TODO: Log the execution of the process method here
-		// TODO: build a properties object for this process here to store the results and errors into as they
 		// TODO: Setup with a heartbeat for monitoring processing of the bonded atom
 		// stream in from the process method
 		// Execute the process method of the atom
-		var results <-chan []byte
-		results = inst.atom.Process(ctx, inst.electron, inst.outbound(ctx))
-
+		inst.properties.Result, inst.properties.Error = inst.atom.Process(ctx, inst.conductor, inst.electron)
 		alog.Printf("electron [%s] processed\n", inst.electron.ElectronID)
-
-		func() {
-			// Continue looping while either of the channels is non-nil and open
-			for results != nil {
-				select {
-				// Monitor the instance context for cancellation
-				case <-ctx.Done():
-					// TODO: mizer.sendLog(fmt.Sprintf("cancelling electron instance [%v] due to cancellation [%s]", ewrap.electron.ID(), instance.ctx.Err().Error()))
-					return
-				case result, ok := <-results:
-					if ok {
-						// Append the results from the bonded instance for return through the properties
-						inst.properties.Result = result
-					}
-					return
-				}
-			}
-		}()
 
 		// TODO: The processing has finished for this bonded atom and the results need to be calculated and the properties sent back to the
 		// conductor
@@ -122,30 +108,39 @@ func (inst *instance) execute(ctx context.Context) {
 	}
 }
 
-func (inst *instance) outbound(ctx context.Context) chan<- Electron {
-	electrons := make(chan Electron)
+// func (inst *instance) outbound(ctx context.Context) chan<- Electron {
+// 	electrons := make(chan Electron)
 
-	go func(electrons chan Electron) {
-		defer close(electrons)
+// 	go func(electrons chan Electron) {
+// 		defer close(electrons)
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case e, ok := <-electrons:
-				if ok {
-					// Push the electron to the conductor
-					inst.conductor.Send(ctx, e)
-				} else {
-					return
-				}
-			}
-		}
+// 		for {
+// 			select {
+// 			case <-ctx.Done():
+// 				return
+// 			case e, ok := <-electrons:
+// 				if ok {
+// 					// Push the electron to the conductor
+// 					if err := inst.conductor.Send(ctx, e); err != nil && e.Respond() != nil {
+// 						select {
+// 						case e.Respond() <- &Properties{
+// 							ElectronID: e.ID(),
+// 							AtomID:     e.AID(),
+// 							Error:      err,
+// 						}:
+// 							alog.Errorf(err, "error occurred while sending outbound electron [%s]", e.ID())
+// 						}
+// 					}
+// 				} else {
+// 					return
+// 				}
+// 			}
+// 		}
 
-	}(electrons)
+// 	}(electrons)
 
-	return electrons
-}
+// 	return electrons
+// }
 
 func (inst *instance) Properties() *Properties {
 	return inst.properties
