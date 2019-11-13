@@ -2,7 +2,6 @@ package atomizer
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"sync"
@@ -286,49 +285,31 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 			if ok {
 
 				mizer.event("marshalling incoming electron")
+				// Ensure that the electron being received is valid
+				if validator.IsValid(e) {
 
-				var electron = &ElectronBase{}
-				if err := json.Unmarshal(e, electron); err == nil {
+					mizer.event(fmt.Sprintf("electron [%s] received", e.ID))
 
-					// Ensure that the electron being received is valid
-					if validator.IsValid(electron) {
-
-						mizer.event(fmt.Sprintf("electron [%s] received", electron.ElectronID))
-
-						// Send the electron down the electrons channel to be processed
-						select {
-						case <-mizer.ctx.Done():
-							return
-						case mizer.electrons <- instance{electron, conductor, nil, nil, nil}:
-							mizer.event(fmt.Sprintf("electron instance [%s] pushed to distribution", electron.ElectronID))
-						}
-					} else {
-
-						props := &Properties{
-							ElectronID: electron.ElectronID,
-							AtomID:     electron.AtomID,
-							Start:      time.Now(),
-							End:        time.Now(),
-							Error:      err,
-							Result:     nil,
-						}
-
-						mizer.error(errors.Errorf("invalid electron passed to atomizer [%v]", electron))
-						conductor.Complete(ctx, props)
+					// Send the electron down the electrons channel to be processed
+					select {
+					case <-mizer.ctx.Done():
+						return
+					case mizer.electrons <- instance{e, conductor, nil, nil, nil}:
+						mizer.event(fmt.Sprintf("electron instance [%s] pushed to distribution", e.ID))
 					}
-
 				} else {
-					mizer.error(errors.Errorf("unable to parse electron [%s] | error: [%s]", string(e), err))
-
-					// TODO: Error parsing the electron, return an error back to the conductor
-					conductor.Complete(ctx, &Properties{
-						ElectronID: "unable to parse",
-						AtomID:     "unable to parse",
+					err := errors.Errorf("invalid electron passed to atomizer [%v]", e)
+					props := &Properties{
+						ElectronID: e.ID,
+						AtomID:     e.AtomID,
 						Start:      time.Now(),
 						End:        time.Now(),
 						Error:      err,
 						Result:     nil,
-					})
+					}
+
+					mizer.error(err)
+					conductor.Complete(ctx, props)
 				}
 			} else { // Channel is closed, break out of the loop
 				mizer.error(errors.Errorf("electron channel for conductor [%v] is closed, exiting read cycle", conductor.ID()))
@@ -404,7 +385,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 				case inst, ok := <-electrons:
 					if ok {
 
-						mizer.event(fmt.Sprintf("creating new instance of electron [%s]", inst.electron.ElectronID))
+						mizer.event(fmt.Sprintf("creating new instance of electron [%s]", inst.electron.ID))
 
 						// TODO: implement the processing push
 						// TODO: after the processing has started push to instances channel for monitoring by the
@@ -414,7 +395,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 						// Initialize a new copy of the atom
 						newAtom := reflect.New(reflect.TypeOf(atom).Elem())
 
-						mizer.event(fmt.Sprintf("new instance of electron [%s] created", inst.electron.ElectronID))
+						mizer.event(fmt.Sprintf("new instance of electron [%s] created", inst.electron.ID))
 
 						go mizer.exec(ctx, inst, newAtom)
 					} else { // Channel is closed, break out of the loop
@@ -441,7 +422,7 @@ func (mizer *atomizer) exec(ctx context.Context, inst instance, newAtom reflect.
 	if a, ok := newAtom.Interface().(Atom); ok {
 		if validator.IsValid(a) {
 
-			mizer.event(fmt.Sprintf("bonding electron [%s]", inst.electron.ElectronID))
+			mizer.event(fmt.Sprintf("bonding electron [%s]", inst.electron.ID))
 
 			// bond the new atom instantiation to the electron instance
 			if err = inst.bond(a); err == nil {
@@ -466,7 +447,7 @@ func (mizer *atomizer) exec(ctx context.Context, inst instance, newAtom reflect.
 			mizer.error(errors.Errorf("invalid atom [%s]", a.ID()))
 		}
 	} else {
-		mizer.error(errors.Errorf("unable to type assert atom [%s] for electron id [%s]", inst.electron.AtomID, inst.electron.ID()))
+		mizer.error(errors.Errorf("unable to type assert atom [%s] for electron id [%s]", inst.electron.AtomID, inst.electron.ID))
 	}
 }
 
@@ -484,7 +465,7 @@ func (mizer *atomizer) distribute() {
 			case ewrap, ok := <-mizer.electrons:
 				if ok {
 
-					mizer.event(fmt.Sprintf("electron [%s] set for distribution to atom [%s]", ewrap.electron.ElectronID, ewrap.electron.AtomID))
+					mizer.event(fmt.Sprintf("electron [%s] set for distribution to atom [%s]", ewrap.electron.ID, ewrap.electron.AtomID))
 					// TODO: how would this call be tracked going forward as part of a go routine? What if this blocks forever?
 					// TODO: Handle the panic here in the event that the channel is closed and return the electron to the channel
 

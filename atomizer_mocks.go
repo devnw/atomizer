@@ -13,7 +13,7 @@ import (
 
 type tresult struct {
 	result   string
-	electron *ElectronBase
+	electron *Electron
 	err      bool
 	panic    bool
 }
@@ -22,7 +22,7 @@ type invalidconductor struct{}
 
 type validconductor struct {
 	id    string
-	echan <-chan []byte
+	echan chan *Electron
 	valid bool
 }
 
@@ -30,11 +30,11 @@ func (cond *validconductor) ID() string {
 	return cond.id
 }
 
-func (cond *validconductor) Receive(ctx context.Context) <-chan []byte {
+func (cond *validconductor) Receive(ctx context.Context) <-chan *Electron {
 	return cond.echan
 }
 
-func (cond *validconductor) Send(ctx context.Context, electron Electron) (response <-chan *Properties, err error) {
+func (cond *validconductor) Send(ctx context.Context, electron *Electron) (response <-chan *Properties, err error) {
 	return response, err
 }
 
@@ -50,13 +50,13 @@ func (cond *validconductor) Close() {}
 
 // TODO: Move passthrough as a conductor implementation for in-node processing
 type passthrough struct {
-	input   chan []byte
+	input   chan *Electron
 	results sync.Map
 }
 
 func (pt *passthrough) ID() string { return "passthrough" }
 
-func (pt *passthrough) Receive(ctx context.Context) <-chan []byte {
+func (pt *passthrough) Receive(ctx context.Context) <-chan *Electron {
 	return pt.input
 }
 
@@ -92,34 +92,30 @@ func (pt *passthrough) Complete(ctx context.Context, properties *Properties) (er
 	return err
 }
 
-func (pt *passthrough) Send(ctx context.Context, electron Electron) (<-chan *Properties, error) {
+func (pt *passthrough) Send(ctx context.Context, electron *Electron) (<-chan *Properties, error) {
 	var err error
 	result := make(chan *Properties)
 
 	if validator.IsValid(electron) {
 		go func(result chan *Properties) {
 
-			var e []byte
-			if e, err = json.Marshal(electron); err == nil {
+			// Only kick off the electron for processing if there isn't already an
+			// instance loaded in the system
+			if _, loaded := pt.results.LoadOrStore(electron.ID, result); !loaded {
 
-				// Only kick off the electron for processing if there isn't already an
-				// instance loaded in the system
-				if _, loaded := pt.results.LoadOrStore(electron.ID(), result); !loaded {
-
-					// Push the electron onto the input channel
-					select {
-					case <-ctx.Done():
-						return
-					case pt.input <- e:
-						// setup a monitoring thread for /basepath/electronid
-					}
-				} else {
-					defer close(result)
-					p := &Properties{}
-					p.Error = errors.Errorf("duplicate electron registration for EID [%s]", electron.ID())
-
-					result <- p
+				// Push the electron onto the input channel
+				select {
+				case <-ctx.Done():
+					return
+				case pt.input <- electron:
+					// setup a monitoring thread for /basepath/electronid
 				}
+			} else {
+				defer close(result)
+				p := &Properties{}
+				p.Error = errors.Errorf("duplicate electron registration for EID [%s]", electron.ID)
+
+				result <- p
 			}
 		}(result)
 	}
@@ -133,14 +129,14 @@ func (pt *passthrough) Close() {
 type printer struct{}
 
 func (p *printer) ID() string { return "printer" }
-func (p *printer) Process(ctx context.Context, conductor Conductor, electron Electron) (result []byte, err error) {
+func (p *printer) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
 
 	if validator.IsValid(electron) {
 		var payload printerdata
 
-		if err = json.Unmarshal(electron.Payload(), &payload); err == nil {
+		if err = json.Unmarshal(electron.Payload, &payload); err == nil {
 
-			fmt.Printf("message from electron [%s] is: %s\n", electron.ID(), payload.Message)
+			fmt.Printf("message from electron [%s] is: %s\n", electron.ID, payload.Message)
 		}
 	}
 
@@ -150,19 +146,19 @@ func (p *printer) Process(ctx context.Context, conductor Conductor, electron Ele
 type bench struct{}
 
 func (b *bench) ID() string { return "bench" }
-func (b *bench) Process(ctx context.Context, conductor Conductor, electron Electron) (result []byte, err error) {
+func (b *bench) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
 	return result, err
 }
 
 type returner struct{}
 
 func (b *returner) ID() string { return "returner" }
-func (b *returner) Process(ctx context.Context, conductor Conductor, electron Electron) (result []byte, err error) {
+func (b *returner) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
 
 	if validator.IsValid(electron) {
 		var payload printerdata
 
-		if err = json.Unmarshal(electron.Payload(), &payload); err == nil {
+		if err = json.Unmarshal(electron.Payload, &payload); err == nil {
 			result = []byte(payload.Message)
 		}
 	}
@@ -174,14 +170,15 @@ type printerdata struct {
 	Message string `json:"message"`
 }
 
-func newElectron(atomID string, payload []byte) (electron *ElectronBase, err error) {
+func newElectron(atomID string, payload []byte) (electron *Electron, err error) {
 
 	id := uuid.New()
 
-	electron = &ElectronBase{
-		ElectronID: id.String(),
-		AtomID:     atomID,
-		Load:       payload,
+	electron = &Electron{
+		SenderID: uuid.New().String(),
+		ID:       id.String(),
+		AtomID:   atomID,
+		Payload:  payload,
 	}
 
 	return electron, err
@@ -190,7 +187,7 @@ func newElectron(atomID string, payload []byte) (electron *ElectronBase, err err
 // harness creates a valid atomizer that uses the passthrough conductor
 func harness(ctx context.Context) (c Conductor, err error) {
 	pass := &passthrough{
-		input: make(chan []byte),
+		input: make(chan *Electron),
 	}
 
 	if validator.IsValid(pass) {

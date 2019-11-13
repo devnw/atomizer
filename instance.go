@@ -10,7 +10,7 @@ import (
 )
 
 type instance struct {
-	electron   *ElectronBase
+	electron   *Electron
 	conductor  Conductor
 	atom       Atom
 	properties *Properties
@@ -34,7 +34,7 @@ func (inst *instance) bond(atom Atom) (err error) {
 			err = errors.Errorf("invalid conductor [%v] when attempting to bond", inst.conductor.ID())
 		}
 	} else {
-		err = errors.Errorf("invalid electron [%s] when attempting to bond", inst.electron.ElectronID)
+		err = errors.Errorf("invalid electron [%s] when attempting to bond", inst.electron.ID)
 	}
 
 	return err
@@ -55,7 +55,7 @@ func (inst *instance) execute(ctx context.Context) {
 		}
 
 		inst.properties = &Properties{
-			ElectronID: inst.electron.ElectronID,
+			ElectronID: inst.electron.ID,
 			AtomID:     inst.atom.ID(),
 			Start:      time.Now(),
 		}
@@ -65,7 +65,7 @@ func (inst *instance) execute(ctx context.Context) {
 			if r := recover(); r != nil {
 				inst.properties.Error = errors.Errorf(
 					"panic in processing of electron [%s] | panic: [%s] | error:[%s]",
-					inst.electron.ElectronID,
+					inst.electron.ID,
 					r,
 					inst.properties.Error,
 				)
@@ -75,19 +75,19 @@ func (inst *instance) execute(ctx context.Context) {
 			inst.properties.End = time.Now()
 
 			if err := inst.conductor.Complete(ctx, inst.properties); err == nil {
-				alog.Printf("completed electron [%s]\n", inst.electron.ElectronID)
+				alog.Printf("completed electron [%s]\n", inst.electron.ID)
 			} else {
-				alog.Errorf(err, "error marking electron [%s] as complete", inst.electron.ElectronID)
+				alog.Errorf(err, "error marking electron [%s] as complete", inst.electron.ID)
 			}
 		}()
 
-		alog.Printf("executing electron [%s]\n", inst.electron.ElectronID)
+		alog.Printf("executing electron [%s]\n", inst.electron.ID)
 
 		// TODO: Setup with a heartbeat for monitoring processing of the bonded atom
 		// stream in from the process method
 		// Execute the process method of the atom
 		inst.properties.Result, inst.properties.Error = inst.atom.Process(ctx, inst.conductor, inst.electron)
-		alog.Printf("electron [%s] processed\n", inst.electron.ElectronID)
+		alog.Printf("electron [%s] processed\n", inst.electron.ID)
 
 		// TODO: The processing has finished for this bonded atom and the results need to be calculated and the properties sent back to the
 		// conductor

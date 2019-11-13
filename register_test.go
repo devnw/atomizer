@@ -18,7 +18,7 @@ func TestRegister(t *testing.T) {
 	}{
 		{ // Valid test
 			"ValidTest",
-			&passthrough{input: make(chan []byte)},
+			&passthrough{input: make(chan *Electron)},
 			false,
 		},
 		{ // Invalid test because value is nil
