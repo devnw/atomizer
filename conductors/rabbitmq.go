@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
-
 	"github.com/benjivesterby/alog"
 	"github.com/benjivesterby/atomizer"
 	"github.com/google/uuid"
@@ -34,14 +33,14 @@ func Connect(connectionstring, inqueue string) (atomizer.Conductor, error) {
 		// TODO: Add additional validation here for formatting later
 
 		// Dial the connection
-		if mq.conn, err = amqp.Dial(connectionstring); err == nil {
-
-		}
+		mq.conn, err = amqp.Dial(connectionstring)
 	}
 
 	return mq, err
 }
 
+//The rabbitmq struct uses the amqp library to connect to rabbitmq in order to send and receive
+//from the message queue.
 type rabbitmq struct {
 	conn *amqp.Connection
 
@@ -61,6 +60,8 @@ func (r *rabbitmq) ID() string {
 	return "rabbitmq"
 }
 
+// Receive gets the atoms from the source that are available to atomize.
+// Part of the Conductor interface
 // Req: 4.1.1.7
 func (r *rabbitmq) Receive(ctx context.Context) <-chan *atomizer.Electron {
 	electrons := make(chan *atomizer.Electron)
@@ -153,6 +154,8 @@ func (r *rabbitmq) fanResults(ctx context.Context) {
 	}
 }
 
+// Gets the list of messages that have been sent to the queue and returns them as a
+// channel of byte arrays
 func (r *rabbitmq) getReceiver(ctx context.Context, queue string) <-chan []byte {
 
 	var err error
@@ -218,6 +221,7 @@ func (r *rabbitmq) getReceiver(ctx context.Context, queue string) <-chan []byte 
 	return out
 }
 
+// Complete mark the completion of an electron instance with applicable statistics
 // Req: 4.1.1.7, 4.1.1.7.2
 func (r *rabbitmq) Complete(ctx context.Context, properties *atomizer.Properties) (err error) {
 
@@ -236,6 +240,7 @@ func (r *rabbitmq) Complete(ctx context.Context, properties *atomizer.Properties
 	return err
 }
 
+//Publishes an electron for processing or publishes a completed electron's properties
 func (r *rabbitmq) publish(ctx context.Context, queue string, message []byte) (err error) {
 	// Create the inbound processing exchanges and queues
 	var results *amqp.Channel
@@ -267,6 +272,7 @@ func (r *rabbitmq) publish(ctx context.Context, queue string, message []byte) (e
 	return err
 }
 
+// Sends electrons back out through the conductor for additional processing
 // Req: 4.1.1.7
 func (r *rabbitmq) Send(ctx context.Context, electron *atomizer.Electron) (<-chan *atomizer.Properties, error) {
 	var e []byte
