@@ -6,6 +6,7 @@ import (
 
 type invalidTestStruct struct{}
 
+// Req: 4.1.1.9
 func TestRegister(t *testing.T) {
 
 	Clean()

@@ -67,6 +67,7 @@ func (mizer *atomizer) init() *atomizer {
 	default:
 
 		// Initialize throttle sampler type here
+		// Req: 4.1.1.6
 		if mizer.throttle == nil {
 			mizer.throttle = &sampler{
 				ctx:     mizer.ctx,
@@ -91,6 +92,7 @@ func (mizer *atomizer) init() *atomizer {
 		}
 
 		// Initialize the atom fan out map and mutex
+		// Req: 4.1.1.3
 		if mizer.atomFanOut == nil {
 			mizer.atomFanOut = make(map[string]chan<- instance)
 			mizer.atomFanOutMut = sync.RWMutex{}
@@ -255,6 +257,7 @@ func (mizer *atomizer) receiveConductor(conductor Conductor) (err error) {
 }
 
 // Reading in from a specific electron channel of a conductor and drop it onto the atomizer channel for electrons
+// Req: 4.1.1.4
 func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 	// defer mizer.error(handle(ctx, conductor, func() {
 
@@ -273,6 +276,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 	for {
 
 		// Sampler throttle here
+		// Req: 4.1.1.6
 		mizer.throttle.Wait()
 
 		select {
@@ -320,6 +324,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 }
 
 // receiveAtom setups a retrieval loop for the conductor being passed in
+// Req: 4.1.1.3
 func (mizer *atomizer) receiveAtom(atom Atom) (err error) {
 	if validator.IsValid(mizer) {
 
@@ -354,6 +359,7 @@ func (mizer *atomizer) receiveAtom(atom Atom) (err error) {
 	return err
 }
 
+// Req: 4.1.1.4
 func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, error) {
 	electrons := make(chan instance)
 	var err error
@@ -393,6 +399,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 						// individually bonded instances
 
 						// Initialize a new copy of the atom
+						// Req: 4.1.1.5.1
 						newAtom := reflect.New(reflect.TypeOf(atom).Elem())
 
 						mizer.event(fmt.Sprintf("new instance of electron [%s] created", inst.electron.ID))
@@ -451,6 +458,7 @@ func (mizer *atomizer) exec(ctx context.Context, inst instance, newAtom reflect.
 	}
 }
 
+// Req: 4.1.1.4
 func (mizer *atomizer) distribute() {
 	// TODO: defer
 	defer close(mizer.electrons)
@@ -462,6 +470,7 @@ func (mizer *atomizer) distribute() {
 			select {
 			case <-mizer.ctx.Done():
 				return
+			// Req: 4.1.1.4
 			case ewrap, ok := <-mizer.electrons:
 				if ok {
 
