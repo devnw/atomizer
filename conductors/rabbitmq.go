@@ -21,6 +21,8 @@ const (
 // the rabbitmq conductor
 func Connect(connectionstring, inqueue string) (atomizer.Conductor, error) {
 	var err error
+
+	// Req: 4.1.1.7.1
 	mq := &rabbitmq{
 		in:                inqueue,
 		uuid:              uuid.New().String(),
@@ -59,6 +61,7 @@ func (r *rabbitmq) ID() string {
 	return "rabbitmq"
 }
 
+// Req: 4.1.1.7
 func (r *rabbitmq) Receive(ctx context.Context) <-chan *atomizer.Electron {
 	electrons := make(chan *atomizer.Electron)
 
@@ -116,17 +119,22 @@ func (r *rabbitmq) fanResults(ctx context.Context) {
 					p := &atomizer.Properties{}
 					if err := json.Unmarshal(result, p); err == nil {
 						var c chan<- *atomizer.Properties
+
+						// Pull the results channel for the electron
 						r.electronchanmutty.Lock()
 						c = r.electronchans[p.ElectronID]
 						r.electronchanmutty.Unlock()
 
+						// Ensure the channel is not nil
 						if c != nil {
+
+							// Close the channel after this result has been pushed
 							defer close(c)
 
 							select {
 							case <-ctx.Done():
 								return
-							case c <- p:
+							case c <- p: // push the result onto the channel
 								alog.Printf("sent electron [%s] results to channel", p.ElectronID)
 							}
 						}
@@ -151,6 +159,7 @@ func (r *rabbitmq) getReceiver(ctx context.Context, queue string) <-chan []byte 
 	var in <-chan amqp.Delivery
 	var out = make(chan []byte)
 	// Create the inbound processing exchanges and queues
+	// Req: 4.1.1.7.4
 	var c *amqp.Channel
 	if c, err = r.conn.Channel(); err == nil {
 
@@ -209,6 +218,7 @@ func (r *rabbitmq) getReceiver(ctx context.Context, queue string) <-chan []byte 
 	return out
 }
 
+// Req: 4.1.1.7, 4.1.1.7.2
 func (r *rabbitmq) Complete(ctx context.Context, properties *atomizer.Properties) (err error) {
 
 	if s, ok := r.sender.Load(properties.ElectronID); ok {
@@ -231,7 +241,7 @@ func (r *rabbitmq) publish(ctx context.Context, queue string, message []byte) (e
 	var results *amqp.Channel
 	if results, err = r.conn.Channel(); err == nil {
 		defer results.Close()
-
+		// Req: 4.1.1.7.4
 		if _, err = results.QueueDeclare(
 			queue, // name
 			true,  // durable
@@ -257,6 +267,7 @@ func (r *rabbitmq) publish(ctx context.Context, queue string, message []byte) (e
 	return err
 }
 
+// Req: 4.1.1.7
 func (r *rabbitmq) Send(ctx context.Context, electron *atomizer.Electron) (<-chan *atomizer.Properties, error) {
 	var e []byte
 	var err error
@@ -275,9 +286,13 @@ func (r *rabbitmq) Send(ctx context.Context, electron *atomizer.Electron) (<-cha
 			// ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 			// defer cancel()
 
+			// Register the electron return channel prior to publishing the request
+			// Req: 4.1.1.7.5
 			r.electronchanmutty.Lock()
 			r.electronchans[electron.ID] = respond
 			r.electronchanmutty.Unlock()
+
+			// publish the request to the message queue
 			if err = r.publish(ctx, r.in, e); err == nil {
 				alog.Printf("sent electron [%s] for processing\n", electron.ID)
 			}

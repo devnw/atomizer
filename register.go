@@ -9,6 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Req: 4.1.1.1, 4.1.1.2
+
 // preRegistrations of atoms and conductors that are loaded using init
 // by libraries utilizing the atomizer
 var preRegistrations sync.Map
