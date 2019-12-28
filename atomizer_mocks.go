@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Pallinder/go-randomdata"
 	"github.com/benjivesterby/validator"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -21,13 +22,8 @@ type tresult struct {
 type invalidconductor struct{}
 
 type validconductor struct {
-	id    string
 	echan chan *Electron
 	valid bool
-}
-
-func (cond *validconductor) ID() string {
-	return cond.id
 }
 
 func (cond *validconductor) Receive(ctx context.Context) <-chan *Electron {
@@ -53,8 +49,6 @@ type passthrough struct {
 	input   chan *Electron
 	results sync.Map
 }
-
-func (pt *passthrough) ID() string { return "passthrough" }
 
 func (pt *passthrough) Receive(ctx context.Context) <-chan *Electron {
 	return pt.input
@@ -123,12 +117,10 @@ func (pt *passthrough) Send(ctx context.Context, electron *Electron) (<-chan *Pr
 	return result, err
 }
 
-func (pt *passthrough) Close() {
-}
+func (pt *passthrough) Close() {}
 
 type printer struct{}
 
-func (p *printer) ID() string { return "printer" }
 func (p *printer) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
 
 	if validator.IsValid(electron) {
@@ -145,14 +137,12 @@ func (p *printer) Process(ctx context.Context, conductor Conductor, electron *El
 
 type bench struct{}
 
-func (b *bench) ID() string { return "bench" }
 func (b *bench) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
 	return result, err
 }
 
 type returner struct{}
 
-func (b *returner) ID() string { return "returner" }
 func (b *returner) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
 
 	if validator.IsValid(electron) {
@@ -164,6 +154,21 @@ func (b *returner) Process(ctx context.Context, conductor Conductor, electron *E
 	}
 
 	return result, err
+}
+
+func spawnReturner(size int) (tests []*tresult) {
+	for i := 0; i < size; i++ {
+		msg := randomdata.SillyName()
+
+		e, _ := newElectron("atomizer.returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
+
+		tests = append(tests, &tresult{
+			result:   msg,
+			electron: e,
+		})
+	}
+
+	return tests
 }
 
 type printerdata struct {
@@ -193,16 +198,16 @@ func harness(ctx context.Context) (c Conductor, err error) {
 	if validator.IsValid(pass) {
 
 		// Register the conductor so it's picked up when the atomizer is initialized
-		if err = Register(ctx, pass.ID(), pass); err == nil {
+		if err = Register(ctx, pass); err == nil {
 
 			// Register the atom so that it's there for processing requests from the conductor
-			if err = Register(ctx, "printer", &printer{}); err == nil {
+			if err = Register(ctx, &printer{}); err == nil {
 
 				// Register the benchmark atom for the benchmark tests
-				if err = Register(ctx, "bench", &bench{}); err == nil {
+				if err = Register(ctx, &bench{}); err == nil {
 
 					// Register the benchmark atom for the benchmark tests
-					if err = Register(ctx, "returner", &returner{}); err == nil {
+					if err = Register(ctx, &returner{}); err == nil {
 
 						// Initialize the atomizer
 						mizer := Atomize(ctx)

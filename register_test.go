@@ -6,36 +6,39 @@ import (
 
 type invalidTestStruct struct{}
 
-// Req: 4.1.1.9
 func TestRegister(t *testing.T) {
 
 	Clean()
 	defer Clean()
 
 	tests := []struct {
+		title string
 		key   string
 		value interface{}
 		err   bool
 	}{
 		{ // Valid test
 			"ValidTest",
+			"atomizer.passthrough",
 			&passthrough{input: make(chan *Electron)},
 			false,
 		},
 		{ // Invalid test because value is nil
 			"NilRegistrationTest",
+			"nil",
 			nil,
 			true,
 		},
 		{ // Invalid test because value is nil
 			"InvalidTypeTest",
+			"atomizer.invalidTestStruct",
 			invalidTestStruct{},
 			true,
 		},
 	}
 
 	for _, test := range tests {
-		if err := Register(nil, test.key, test.value); err == nil {
+		if err := Register(nil, test.value); err == nil {
 			if value, ok := preRegistrations.Load(test.key); ok {
 				if _, ok := value.(*passthrough); ok {
 					if test.err {

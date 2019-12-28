@@ -28,10 +28,10 @@ func (inst *instance) bond(atom Atom) (err error) {
 			if validator.IsValid(atom) {
 				inst.atom = atom
 			} else {
-				err = errors.Errorf("invalid atom [%s] when attempting to bond", atom.ID())
+				err = errors.Errorf("invalid atom [%s] when attempting to bond", Id(atom))
 			}
 		} else {
-			err = errors.Errorf("invalid conductor [%v] when attempting to bond", inst.conductor.ID())
+			err = errors.Errorf("invalid conductor [%s] when attempting to bond", Id(inst.conductor))
 		}
 	} else {
 		err = errors.Errorf("invalid electron [%s] when attempting to bond", inst.electron.ID)
@@ -56,7 +56,7 @@ func (inst *instance) execute(ctx context.Context) {
 
 		inst.properties = &Properties{
 			ElectronID: inst.electron.ID,
-			AtomID:     inst.atom.ID(),
+			AtomID:     Id(inst.atom),
 			Start:      time.Now(),
 		}
 

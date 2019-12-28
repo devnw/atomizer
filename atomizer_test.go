@@ -12,7 +12,6 @@ import (
 )
 
 // TODO: Add result nil checks on conductor response
-// Req: 4.1.1.8
 func TestAtomizer_Exec(t *testing.T) {
 
 	Clean()
@@ -25,7 +24,7 @@ func TestAtomizer_Exec(t *testing.T) {
 	if conductor, err := harness(ctx); err == nil {
 
 		msg := randomdata.SillyName()
-		e, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
+		e, _ := newElectron("atomizer.returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
 		test := &tresult{
 			result:   msg,
 			electron: e,
@@ -81,18 +80,6 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 	var ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	var tests []*tresult
-	for i := 0; i < 50; i++ {
-		msg := randomdata.SillyName()
-
-		e, _ := newElectron("returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
-
-		tests = append(tests, &tresult{
-			result:   msg,
-			electron: e,
-		})
-	}
-
 	if conductor, err := harness(ctx); err == nil {
 		var sent = time.Now()
 
@@ -102,11 +89,13 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for _, test := range tests {
+			for _, test := range spawnReturner(50) {
 
 				wg.Add(1)
 				go func(test *tresult) {
 					defer wg.Done()
+
+					var err error
 
 					var result <-chan *Properties
 					// Send the electron onto the conductor
@@ -164,7 +153,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 		{
 			"ValidTestValidConductor",
-			&validconductor{"ValidTestValidConductor", make(chan *Electron), true},
+			&validconductor{make(chan *Electron), true},
 			false,
 		},
 		{
@@ -191,7 +180,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		// Store the test conductor
 		if test.err || (!test.err && test.value != nil) {
 			// Store invalid conductor
-			Register(nil, test.key, test.value)
+			Register(nil, test.value)
 		}
 
 		mizer := Atomize(context.Background())
@@ -218,17 +207,17 @@ func TestAtomizer_AddConductor(t *testing.T) {
 	}{
 		{
 			"ValidTestEmptyConductor",
-			&validconductor{"ValidTestEmptyConductor", make(chan *Electron), true},
+			&validconductor{make(chan *Electron), true},
 			false,
 		},
 		{
 			"InvalidTestConductor",
-			&validconductor{"InvalidTestConductor", make(chan *Electron), false},
+			&validconductor{make(chan *Electron), false},
 			true,
 		},
 		{
 			"InvalidTestConductorNilElectron",
-			&validconductor{"InvalidTestConductorNilElectron", nil, true},
+			&validconductor{nil, true},
 			true,
 		},
 		{
@@ -267,7 +256,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 				if validator.IsValid(mizer) {
 
 					// Add the conductor
-					if err = Register(ctx, test.key, test.value); err == nil {
+					if err = Register(ctx, test.value); err == nil {
 
 						select {
 						case <-ctx.Done():
@@ -367,7 +356,7 @@ func BenchmarkAtomizer_Exec_Single(b *testing.B) {
 		b.ResetTimer()
 
 		for n := 0; n < b.N; n++ {
-			if e, err := newElectron("bench", nil); err == nil {
+			if e, err := newElectron("atomizer.bench", nil); err == nil {
 				var result <-chan *Properties
 				// Send the electron onto the conductor
 				if result, err = conductor.Send(ctx, e); err == nil {

@@ -12,7 +12,6 @@ import (
 // processing capacity available to continue adding new electrons
 // to the system or whether or not the initialization of new electrons
 // should be temporarily halted
-// Req: 4.1.1.6
 type sampler struct {
 	process chan bool
 	once    *sync.Once
@@ -32,7 +31,6 @@ func (sampl sampler) sample() {
 				return
 			default:
 				if v, err := mem.VirtualMemory(); err == nil {
-					// Req: 4.1.1.6.1
 					if v.UsedPercent <= 70.00 {
 						// reset the sub context so the timeout goes away
 						subctx = nil

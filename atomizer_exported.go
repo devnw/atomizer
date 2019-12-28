@@ -41,7 +41,6 @@ func (mizer *atomizer) Exec() (err error) {
 			mizer.event("pulling conductor and atom registrations")
 
 			// Start up the receivers
-			// Req: 4.1.1.1, 4.1.1.2
 			if err = mizer.receive(Registrations(mizer.ctx)); err == nil {
 
 				// Setup the distribution loop for incoming electrons

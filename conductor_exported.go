@@ -6,9 +6,6 @@ import "context"
 // that need processing. This should generally be registered with the atomizer in an initialization script
 type Conductor interface {
 
-	// ID returns the unique name of the conductor
-	ID() string
-
 	// Receive gets the atoms from the source that are available to atomize
 	Receive(ctx context.Context) <-chan *Electron
 
