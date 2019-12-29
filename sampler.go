@@ -31,7 +31,9 @@ func (sampl sampler) sample() {
 				return
 			default:
 				if v, err := mem.VirtualMemory(); err == nil {
-					if v.UsedPercent <= 70.00 {
+
+					// TODO: Work on this
+					if v.UsedPercent <= 100 {
 						// reset the sub context so the timeout goes away
 						subctx = nil
 
@@ -44,7 +46,7 @@ func (sampl sampler) sample() {
 					} else {
 						if subctx == nil {
 							var cancel context.CancelFunc
-							subctx, cancel = context.WithTimeout(sampl.ctx, time.Second*15)
+							subctx, cancel = context.WithTimeout(sampl.ctx, time.Second*300)
 							defer cancel()
 						}
 
