@@ -211,10 +211,10 @@ func (mizer *atomizer) register(registration interface{}) (err error) {
 			// Switch over the registration type
 			switch v := registration.(type) {
 			case Conductor:
-				mizer.event(fmt.Sprintf("receiving conductor [%s]", Id(v)))
+				mizer.event(fmt.Sprintf("receiving conductor [%s]", ID(v)))
 				err = mizer.receiveConductor(v)
 			case Atom:
-				mizer.event(fmt.Sprintf("receiving atom [%s]", Id(v)))
+				mizer.event(fmt.Sprintf("receiving atom [%s]", ID(v)))
 				err = mizer.receiveAtom(v)
 			default:
 				// error here because the type is unknown
@@ -246,7 +246,7 @@ func (mizer *atomizer) receiveConductor(conductor Conductor) (err error) {
 			go mizer.conduct(mizer.ctx, conductor)
 
 		} else {
-			err = errors.Errorf("invalid conductor [%s] set to be received", Id(conductor))
+			err = errors.Errorf("invalid conductor [%s] set to be received", ID(conductor))
 		}
 
 	} else {
@@ -268,7 +268,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 	// 	mizer.error(mizer.Register(conductor))
 	// }))
 
-	mizer.event(fmt.Sprintf("conductor [%s] initialized", Id(conductor)))
+	mizer.event(fmt.Sprintf("conductor [%s] initialized", ID(conductor)))
 	receiver := conductor.Receive(ctx)
 
 	// Read from the electron channel for mizer conductor and push onto the mizer electron channel for processing
@@ -314,7 +314,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 					conductor.Complete(ctx, props)
 				}
 			} else { // Channel is closed, break out of the loop
-				mizer.error(errors.Errorf("electron channel for conductor [%s] is closed, exiting read cycle", Id(conductor)))
+				mizer.error(errors.Errorf("electron channel for conductor [%s] is closed, exiting read cycle", ID(conductor)))
 				return
 			}
 		}
@@ -331,23 +331,23 @@ func (mizer *atomizer) receiveAtom(atom Atom) (err error) {
 			var electrons chan<- instance
 			// setup atom receiver
 			if electrons, err = mizer.split(mizer.ctx, atom); err == nil {
-				mizer.event(fmt.Sprintf("splitting atom [%s]", Id(atom)))
+				mizer.event(fmt.Sprintf("splitting atom [%s]", ID(atom)))
 
 				if electrons != nil {
 
 					// Register the atom into the atomizer for receiving electrons
 					mizer.atomFanOutMut.Lock()
-					mizer.event(fmt.Sprintf("registering electron channel for atom [%s]", Id(atom)))
-					mizer.atomFanOut[Id(atom)] = electrons
+					mizer.event(fmt.Sprintf("registering electron channel for atom [%s]", ID(atom)))
+					mizer.atomFanOut[ID(atom)] = electrons
 					mizer.atomFanOutMut.Unlock()
 				} else {
-					err = errors.Errorf("atom [%s] returned nil electron channel post split", Id(atom))
+					err = errors.Errorf("atom [%s] returned nil electron channel post split", ID(atom))
 				}
 			} else {
-				err = errors.Errorf("error splitting atom [%s] | %s", Id(atom), err.Error())
+				err = errors.Errorf("error splitting atom [%s] | %s", ID(atom), err.Error())
 			}
 		} else {
-			err = errors.Errorf("invalid atom [%s] to be split", Id(atom))
+			err = errors.Errorf("invalid atom [%s] to be split", ID(atom))
 		}
 	} else {
 		err = errors.New("invalid atomizer")
@@ -368,7 +368,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 				// remove the electron channel from the map of atoms so that it can be
 				// properly cleaned up before re-registering
 				mizer.atomFanOutMut.Lock()
-				delete(mizer.atomFanOut, Id(atom))
+				delete(mizer.atomFanOut, ID(atom))
 				mizer.atomFanOutMut.Unlock()
 
 				// Self Heal - Re-place the atom on the register channel for the atomizer
@@ -401,7 +401,7 @@ func (mizer *atomizer) split(ctx context.Context, atom Atom) (chan<- instance, e
 
 						go mizer.exec(ctx, inst, newAtom)
 					} else { // Channel is closed, break out of the loop
-						mizer.error(errors.Errorf("electron channel for conductor [%s] is closed, exiting read cycle", Id(atom)))
+						mizer.error(errors.Errorf("electron channel for conductor [%s] is closed, exiting read cycle", ID(atom)))
 						return
 					}
 				}
@@ -443,10 +443,10 @@ func (mizer *atomizer) exec(ctx context.Context, inst instance, newAtom reflect.
 				// Execute the instance after it's been picked up for monitoring
 				inst.execute(ctx)
 			} else {
-				mizer.error(errors.Errorf("error while bonding atom [%s]: [%s]", Id(a), err.Error()))
+				mizer.error(errors.Errorf("error while bonding atom [%s]: [%s]", ID(a), err.Error()))
 			}
 		} else {
-			mizer.error(errors.Errorf("invalid atom [%s]", Id(a)))
+			mizer.error(errors.Errorf("invalid atom [%s]", ID(a)))
 		}
 	} else {
 		mizer.error(errors.Errorf("unable to type assert atom [%s] for electron id [%s]", inst.electron.AtomID, inst.electron.ID))

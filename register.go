@@ -93,17 +93,17 @@ func Register(ctx context.Context, value interface{}) (err error) {
 			} else {
 
 				// Ensure the key is not being duplicated in the pre-registration map
-				if _, ok := preRegistrations.Load(Id(value)); !ok {
-					preRegistrations.Store(Id(value), value)
+				if _, ok := preRegistrations.Load(ID(value)); !ok {
+					preRegistrations.Store(ID(value), value)
 				} else {
-					err = errors.Errorf("cannot register item [%s] because this key is already in use", Id(value))
+					err = errors.Errorf("cannot register item [%s] because this key is already in use", ID(value))
 				}
 			}
 		default:
-			err = errors.Errorf("cannot register item [%s] because it is not a supported type", Id(value))
+			err = errors.Errorf("cannot register item [%s] because it is not a supported type", ID(value))
 		}
 	} else {
-		err = errors.Errorf("cannot register item [%s] because it is invalid", Id(value))
+		err = errors.Errorf("cannot register item [%s] because it is invalid", ID(value))
 	}
 
 	return err
