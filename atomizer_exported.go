@@ -10,7 +10,7 @@ import (
 // Atomizer interface implementation
 type Atomizer interface {
 	Exec() error
-	Register(value interface{}) error
+	Register(value ...interface{}) error
 	Events(buffer int) <-chan string
 	Errors(buffer int) <-chan error
 	Properties(buffer int) (<-chan Properties, error)
@@ -19,13 +19,6 @@ type Atomizer interface {
 
 // Atomize initialize instance of the atomizer to start reading from conductors and execute bonded electrons/atoms
 func Atomize(ctx context.Context) Atomizer {
-	defer func() {
-		if r := recover(); r != nil {
-			// TODO:
-			// err = errors.Errorf("panic in register, unable to register [%v]; [%s]", reflect.TypeOf(registration), r)
-		}
-	}()
-
 	return (&atomizer{ctx: ctx}).init()
 }
 
@@ -33,45 +26,39 @@ func Atomize(ctx context.Context) Atomizer {
 // on imported libraries and starts up the receivers for atoms and conductors
 func (mizer *atomizer) Exec() (err error) {
 
-	if validator.IsValid(mizer) {
+	// Execute on the atomizer should only ever be run once
+	mizer.execSyncOnce.Do(func() {
 
-		// Execute on the atomizer should only ever be run once
-		mizer.execSyncOnce.Do(func() {
+		mizer.event("pulling conductor and atom registrations")
 
-			mizer.event("pulling conductor and atom registrations")
+		// Start up the receivers
+		if err = mizer.receive(Registrations(mizer.ctx)); err == nil {
 
-			// Start up the receivers
-			if err = mizer.receive(Registrations(mizer.ctx)); err == nil {
+			// Setup the distribution loop for incoming electrons
+			// so that they can be properly fanned out to the atom
+			// receivers
+			go mizer.distribute()
+		}
 
-				// Setup the distribution loop for incoming electrons
-				// so that they can be properly fanned out to the atom
-				// receivers
-				go mizer.distribute()
-			}
-
-			// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
-		})
-	} else {
-		// TODO:
-	}
+		// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
+	})
 
 	return err
 }
 
 // Register allows you to add additional type registrations to the atomizer (ie. Conductors and Atoms)
-func (mizer *atomizer) Register(value interface{}) (err error) {
+func (mizer *atomizer) Register(values ...interface{}) (err error) {
 
-	// validate the atomizer initialization itself
-	if validator.IsValid(mizer) {
+	for _, value := range values {
+		if validator.Valid(value) {
 
-		// Pass the value on the registrations channel to be received
-		select {
-		case <-mizer.ctx.Done():
-			return
-		case mizer.registrations <- value:
+			// Pass the value on the registrations channel to be received
+			select {
+			case <-mizer.ctx.Done():
+				return
+			case mizer.registrations <- value:
+			}
 		}
-	} else {
-		err = errors.New("invalid object to register")
 	}
 
 	return err

@@ -179,8 +179,9 @@ func TestAtomizeNoConductors(t *testing.T) {
 
 		// Store the test conductor
 		if test.err || (!test.err && test.value != nil) {
+			// TODO: should the error be ignored here?
 			// Store invalid conductor
-			Register(nil, test.value)
+			_ = Register(nil, test.value)
 		}
 
 		mizer := Atomize(context.Background())

@@ -70,40 +70,43 @@ func Registrations(ctx context.Context) <-chan interface{} {
 // and allows them to be pre-registered using an init script rather than
 // having them passed in later at run time. This is useful for some situations
 // where the user may not want to register explicitly
-func Register(ctx context.Context, value interface{}) (err error) {
+func Register(ctx context.Context, values ...interface{}) (err error) {
 
-	// Validate the value coming into the register method
-	if validator.IsValid(value) {
+	for _, value := range values {
 
-		// Type assert the value to ensure we're only registering expected values in the maps
-		switch value.(type) {
-		case Conductor, Atom:
+		// Validate the value coming into the register method
+		if validator.IsValid(value) {
 
-			// If the regchan is valid and initialized then send the value directly to the receiver
-			// this will handle any plugins where init is called at plugin load time so that the
-			// different registrations are handled immediately and the map doesn't have to be monitored
-			// by the registration methods
-			if regchan != nil {
-				select {
-				case <-ctx.Done():
-					err = ctx.Err()
-					return
-				case regchan <- value:
-				}
-			} else {
+			// Type assert the value to ensure we're only registering expected values in the maps
+			switch value.(type) {
+			case Conductor, Atom:
 
-				// Ensure the key is not being duplicated in the pre-registration map
-				if _, ok := preRegistrations.Load(ID(value)); !ok {
-					preRegistrations.Store(ID(value), value)
+				// If the regchan is valid and initialized then send the value directly to the receiver
+				// this will handle any plugins where init is called at plugin load time so that the
+				// different registrations are handled immediately and the map doesn't have to be monitored
+				// by the registration methods
+				if regchan != nil {
+					select {
+					case <-ctx.Done():
+						err = ctx.Err()
+						return
+					case regchan <- value:
+					}
 				} else {
-					err = errors.Errorf("cannot register item [%s] because this key is already in use", ID(value))
+
+					// Ensure the key is not being duplicated in the pre-registration map
+					if _, ok := preRegistrations.Load(ID(value)); !ok {
+						preRegistrations.Store(ID(value), value)
+					} else {
+						err = errors.Errorf("cannot register item [%s] because this key is already in use", ID(value))
+					}
 				}
+			default:
+				err = errors.Errorf("cannot register item [%s] because it is not a supported type", ID(value))
 			}
-		default:
-			err = errors.Errorf("cannot register item [%s] because it is not a supported type", ID(value))
+		} else {
+			err = errors.Errorf("cannot register item [%s] because it is invalid", ID(value))
 		}
-	} else {
-		err = errors.Errorf("cannot register item [%s] because it is invalid", ID(value))
 	}
 
 	return err

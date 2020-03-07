@@ -28,10 +28,6 @@ type atomizer struct {
 	// into the system while it's alive
 	registrations chan interface{}
 
-	// This is the communication channel for the atoms being read into the system
-	// and is used to create atom workers for bonding purposes
-	atoms chan Atom
-
 	throttle *sampler
 
 	// This sync.Map contains the channels for handling each of the bondings for the
@@ -311,7 +307,7 @@ func (mizer *atomizer) conduct(ctx context.Context, conductor Conductor) {
 					}
 
 					mizer.error(err)
-					conductor.Complete(ctx, props)
+					_ = conductor.Complete(ctx, props)
 				}
 			} else { // Channel is closed, break out of the loop
 				mizer.error(errors.Errorf("electron channel for conductor [%s] is closed, exiting read cycle", ID(conductor)))

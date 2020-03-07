@@ -83,7 +83,8 @@ type rabbitmq struct {
 func (r *rabbitmq) Cleanup() {
 	select {
 	case <-r.ctx.Done():
-		r.connection.Close()
+		// TODO: should the error be ignored here?
+		_ = r.connection.Close()
 	}
 }
 
@@ -218,7 +219,10 @@ func (r *rabbitmq) getReceiver(ctx context.Context, queue string) <-chan []byte 
 					nil,   // args
 				); err == nil {
 					go func(in <-chan amqp.Delivery, out chan<- []byte) {
-						defer c.Close()
+						defer func() {
+							_ = c.Close()
+						}()
+
 						defer close(out)
 
 						for {
@@ -298,7 +302,9 @@ func (r *rabbitmq) getPublisher(ctx context.Context, queue string) chan<- []byte
 			var c *amqp.Channel
 			var err error
 			if c, err = connection.Channel(); err == nil {
-				defer c.Close()
+				defer func() {
+					_ = c.Close()
+				}()
 
 				if _, err = c.QueueDeclare(
 					queue, // name
