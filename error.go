@@ -1,6 +1,8 @@
 package atomizer
 
-import "github.com/benjivesterby/validator"
+import (
+	"fmt"
+)
 
 type aErr struct {
 	err error

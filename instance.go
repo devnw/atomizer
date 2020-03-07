@@ -92,7 +92,7 @@ func (inst *instance) execute(ctx context.Context) {
 		// TODO: The processing has finished for this bonded atom and the results need to be calculated and the properties sent back to the
 		// conductor
 
-		// TODO: Ensure mizer is the proper thing to do here?? I think it needs to close mizer out
+		// TODO: Ensure a is the proper thing to do here?? I think it needs to close a out
 		//  at the conductor rather than here... unless the conductor overrode the call back
 
 		// TODO: Execute the callback with the notification here?

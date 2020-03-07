@@ -184,9 +184,9 @@ func TestAtomizeNoConductors(t *testing.T) {
 			_ = Register(context.Background(), test.value)
 		}
 
-		mizer := Atomize(context.Background())
-		if err := mizer.Exec(); test.err && err == nil {
-			if !validator.IsValid(mizer) {
+		a := Atomize(context.Background())
+		if err := a.Exec(); test.err && err == nil {
+			if !validator.IsValid(a) {
 				t.Errorf("atomizer was expected to be valid but was returned invalid")
 			}
 		} else if !test.err && err != nil {
@@ -249,12 +249,12 @@ func TestAtomizer_AddConductor(t *testing.T) {
 			var err error
 
 			// Create an instance of the atomizer to test the add conductor with
-			mizer := Atomize(ctx)
-			errs := mizer.Errors(0)
+			a := Atomize(ctx)
+			errs := a.Errors(0)
 
-			if err = mizer.Exec(); err == nil {
+			if err = a.Exec(); err == nil {
 
-				if validator.IsValid(mizer) {
+				if validator.IsValid(a) {
 
 					// Add the conductor
 					if err = Register(ctx, test.value); err == nil {
@@ -427,7 +427,7 @@ func BenchmarkAtomizer_Exit100(b *testing.B) {
 
 // Benchmarks the validation method of the atomizer
 func BenchmarkAtomizer_Validate(b *testing.B) {
-	var mizer = &atomizer{
+	var a = &atomizer{
 		electrons: make(chan instance),
 		bonded:    make(chan instance),
 		ctx:       context.Background(),
@@ -437,7 +437,7 @@ func BenchmarkAtomizer_Validate(b *testing.B) {
 	}
 
 	for n := 0; n < b.N; n++ {
-		if !validator.IsValid(mizer) {
+		if !validator.IsValid(a) {
 			b.Error("invalid atomizer, expected valid")
 		}
 	}

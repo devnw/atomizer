@@ -210,10 +210,10 @@ func harness(ctx context.Context) (c Conductor, err error) {
 					if err = Register(ctx, &returner{}); err == nil {
 
 						// Initialize the atomizer
-						mizer := Atomize(ctx)
+						a := Atomize(ctx)
 
 						// Start the execution threads
-						if err = mizer.Exec(); err == nil {
+						if err = a.Exec(); err == nil {
 							c = pass
 						}
 					}

@@ -24,20 +24,20 @@ func Atomize(ctx context.Context) Atomizer {
 
 // Exec kicks off the processing of the atomizer by pulling in the pre-registrations through init calls
 // on imported libraries and starts up the receivers for atoms and conductors
-func (mizer *atomizer) Exec() (err error) {
+func (a *atomizer) Exec() (err error) {
 
 	// Execute on the atomizer should only ever be run once
-	mizer.execSyncOnce.Do(func() {
+	a.execSyncOnce.Do(func() {
 
-		mizer.event("pulling conductor and atom registrations")
+		a.event("pulling conductor and atom registrations")
 
 		// Start up the receivers
-		if err = mizer.receive(Registrations(mizer.ctx)); err == nil {
+		if err = a.receive(Registrations(a.ctx)); err == nil {
 
 			// Setup the distribution loop for incoming electrons
 			// so that they can be properly fanned out to the atom
 			// receivers
-			go mizer.distribute()
+			go a.distribute()
 		} else {
 			err = aErr{err, "error while receiving registrations in atomizer execution"}
 		}
@@ -49,10 +49,10 @@ func (mizer *atomizer) Exec() (err error) {
 }
 
 // Register allows you to add additional type registrations to the atomizer (ie. Conductors and Atoms)
-func (mizer *atomizer) Register(values ...interface{}) (err error) {
+func (a *atomizer) Register(values ...interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = aErr{errors.New(r), "panic occurred while registering elements in atomizer"}
+			err = aErr{errors.Errorf("%s", r), "panic occurred while registering elements in atomizer"}
 		}
 	}()
 
@@ -61,9 +61,9 @@ func (mizer *atomizer) Register(values ...interface{}) (err error) {
 
 			// Pass the value on the registrations channel to be received
 			select {
-			case <-mizer.ctx.Done():
+			case <-a.ctx.Done():
 				return
-			case mizer.registrations <- value:
+			case a.registrations <- value:
 			}
 		}
 	}
@@ -73,10 +73,10 @@ func (mizer *atomizer) Register(values ...interface{}) (err error) {
 
 // properties initializes the properties channel if it isn't already allocated and then returns the properties channel of
 // the atomizer so that the requestor can start getting properties as processing finishes on their atoms
-func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
+func (a *atomizer) Properties(buffer int) (<-chan Properties, error) {
 	var err error
 
-	if mizer.properties == nil {
+	if a.properties == nil {
 
 		// Ensure that a proper buffer size was passed for the channel
 		if buffer < 0 {
@@ -84,18 +84,18 @@ func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
 		}
 
 		// Only upon request should the error channel be established meaning a user should read from the channel
-		mizer.properties = make(chan Properties, buffer)
+		a.properties = make(chan Properties, buffer)
 	}
 
-	return mizer.properties, err
+	return a.properties, err
 }
 
 // Errors creates a channel to receive errors from the atomizer and return the channel for logging purposes
-func (mizer *atomizer) Errors(buffer int) <-chan error {
-	mizer.outputMutty.Lock()
-	defer mizer.outputMutty.Unlock()
+func (a *atomizer) Errors(buffer int) <-chan error {
+	a.outputMutty.Lock()
+	defer a.outputMutty.Unlock()
 
-	if mizer.errors == nil {
+	if a.errors == nil {
 
 		// Ensure that a proper buffer size was passed for the channel
 		if buffer < 0 {
@@ -103,18 +103,18 @@ func (mizer *atomizer) Errors(buffer int) <-chan error {
 		}
 
 		// Only upon request should the error channel be established meaning a user should read from the channel
-		mizer.errors = make(chan error, buffer)
+		a.errors = make(chan error, buffer)
 	}
 
-	return mizer.errors
+	return a.errors
 }
 
 // Events creates a channel to receive events from the atomizer and return the channel for logging purposes
-func (mizer *atomizer) Events(buffer int) <-chan string {
-	mizer.outputMutty.Lock()
-	defer mizer.outputMutty.Unlock()
+func (a *atomizer) Events(buffer int) <-chan string {
+	a.outputMutty.Lock()
+	defer a.outputMutty.Unlock()
 
-	if mizer.events == nil {
+	if a.events == nil {
 
 		// Ensure that a proper buffer size was passed for the channel
 		if buffer < 0 {
@@ -122,14 +122,14 @@ func (mizer *atomizer) Events(buffer int) <-chan string {
 		}
 
 		// Only upon request should the event channel be established meaning a user should read from the channel
-		mizer.events = make(chan string, buffer)
+		a.events = make(chan string, buffer)
 	}
 
-	return mizer.events
+	return a.events
 }
 
 // Wait blocks on the context done channel to allow for the executable
 // to block for the atomizer to finish processing
-func (mizer *atomizer) Wait() {
-	<-mizer.ctx.Done()
+func (a *atomizer) Wait() {
+	<-a.ctx.Done()
 }
