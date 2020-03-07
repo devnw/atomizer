@@ -15,8 +15,8 @@ import (
 type tresult struct {
 	result   string
 	electron *Electron
-	err      bool
-	panic    bool
+	// err      bool
+	// panic    bool
 }
 
 type invalidconductor struct{}

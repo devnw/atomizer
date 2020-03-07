@@ -38,6 +38,8 @@ func (mizer *atomizer) Exec() (err error) {
 			// so that they can be properly fanned out to the atom
 			// receivers
 			go mizer.distribute()
+		} else {
+			err = aErr{err, "error while receiving registrations in atomizer execution"}
 		}
 
 		// TODO: Setup the instance receivers for monitoring of individual instances as well as sending of outbound electrons
@@ -48,6 +50,11 @@ func (mizer *atomizer) Exec() (err error) {
 
 // Register allows you to add additional type registrations to the atomizer (ie. Conductors and Atoms)
 func (mizer *atomizer) Register(values ...interface{}) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = aErr{errors.New(r), "panic occurred while registering elements in atomizer"}
+		}
+	}()
 
 	for _, value := range values {
 		if validator.Valid(value) {
@@ -69,20 +76,15 @@ func (mizer *atomizer) Register(values ...interface{}) (err error) {
 func (mizer *atomizer) Properties(buffer int) (<-chan Properties, error) {
 	var err error
 
-	// validate the atomizer initialization itself
-	if validator.IsValid(mizer) {
-		if mizer.properties == nil {
+	if mizer.properties == nil {
 
-			// Ensure that a proper buffer size was passed for the channel
-			if buffer < 0 {
-				buffer = 0
-			}
-
-			// Only upon request should the error channel be established meaning a user should read from the channel
-			mizer.properties = make(chan Properties, buffer)
+		// Ensure that a proper buffer size was passed for the channel
+		if buffer < 0 {
+			buffer = 0
 		}
-	} else {
-		err = errors.New("invalid atomizer")
+
+		// Only upon request should the error channel be established meaning a user should read from the channel
+		mizer.properties = make(chan Properties, buffer)
 	}
 
 	return mizer.properties, err

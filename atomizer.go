@@ -98,38 +98,30 @@ func (mizer *atomizer) init() *atomizer {
 
 // If the error channel is not nil then send the error on the channel
 func (mizer *atomizer) error(err error) {
-	if validator.IsValid(mizer) {
-		if err != nil {
-			if mizer.errors != nil {
 
-				select {
-				case <-mizer.ctx.Done():
-					defer close(mizer.errors)
-					return
+	if validator.Valid(mizer.errors, err) {
+		select {
+		case <-mizer.ctx.Done():
+			defer close(mizer.errors)
+			return
 
-				case mizer.errors <- err:
-				}
-			}
+		case mizer.errors <- err:
+			// Sent the error on the channel
 		}
-
 	}
 }
 
 // If the event channel is not nil then send the event on the channel
 func (mizer *atomizer) event(event string) {
-	if len(event) > 0 {
-		if validator.IsValid(mizer) {
-			if mizer.events != nil {
 
-				select {
-				case <-mizer.ctx.Done():
-					defer close(mizer.events)
-					return
+	if validator.Valid(mizer.events, event) {
+		select {
+		case <-mizer.ctx.Done():
+			defer close(mizer.events)
+			return
 
-				case mizer.events <- event:
-					// Sent the error on the channel
-				}
-			}
+		case mizer.events <- event:
+			// Sent the event on the channel
 		}
 	}
 }
@@ -142,52 +134,52 @@ func (mizer *atomizer) receive(externalRegistations <-chan interface{}) (err err
 		mizer.registrations = make(chan interface{})
 	}
 
-	// Validate the mizer instance
-	if validator.IsValid(mizer) {
-
+	go func() {
+		// TODO: handle panics and re-init
 		go func() {
-			// TODO: handle panics and re-init
-			// TODO: Self-heal with heartbeats
+			if r := recover(); r != nil {
 
-			// Close the registrations channel
-			defer close(mizer.registrations)
-
-			// Cancel out the atomizer in the event of a panic at the receiver because
-			// this cannot be effectively restarted without creating an inconsistent state
-			defer mizer.cancel()
-
-			for {
-				select {
-				case <-mizer.ctx.Done():
-					return
-
-				// Handle the external-registrations
-				case registration, ok := <-externalRegistations:
-					if ok {
-						if err := mizer.register(registration); err != nil {
-							mizer.error(err)
-						}
-					} else {
-						// channel closed
-						panic("unexpected closing of the externalRegistations channel in the atomizer")
-					}
-
-				// Handle the real-time registrations
-				case registration, ok := <-mizer.registrations:
-					if ok {
-						if err := mizer.register(registration); err != nil {
-							mizer.error(err)
-						}
-					} else {
-						// channel closed
-						panic("unexpected closing of the registrations channel in the atomizer")
-					}
-				}
 			}
 		}()
-	} else {
-		err = errors.New("invalid atomizer object")
-	}
+
+		// TODO: Self-heal with heartbeats
+
+		// Close the registrations channel
+		defer close(mizer.registrations)
+
+		// Cancel out the atomizer in the event of a panic at the receiver because
+		// this cannot be effectively restarted without creating an inconsistent state
+		defer mizer.cancel()
+
+		for {
+			select {
+			case <-mizer.ctx.Done():
+				return
+
+			// Handle the external-registrations
+			case registration, ok := <-externalRegistations:
+				if ok {
+					if err := mizer.register(registration); err != nil {
+						mizer.error(err)
+					}
+				} else {
+					// channel closed
+					panic("unexpected closing of the externalRegistations channel in the atomizer")
+				}
+
+			// Handle the real-time registrations
+			case registration, ok := <-mizer.registrations:
+				if ok {
+					if err := mizer.register(registration); err != nil {
+						mizer.error(err)
+					}
+				} else {
+					// channel closed
+					panic("unexpected closing of the registrations channel in the atomizer")
+				}
+			}
+		}
+	}()
 
 	return err
 }

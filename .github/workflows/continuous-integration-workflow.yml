@@ -45,7 +45,7 @@ jobs:
       - name: Execute staticcheck
         run: |
           go get -u honnef.co/go/tools/cmd/staticcheck
-          staticcheck ./...
+          staticcheck -tests=0 ./...
       - name: Execute go vet
         run: go vet -race ./...
   test:
@@ -83,4 +83,4 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Build
-      run: go build
+      run: go build ./...

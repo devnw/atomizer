@@ -2,30 +2,29 @@ package atomizer
 
 import "github.com/benjivesterby/validator"
 
-type atomError struct {
+type aErr struct {
 	err error
+	msg string
 }
 
-func (a atomError) Error() string {
-	if !validator.Valid(a) {
-		panic("invalid error")
+func (a aErr) Error() string {
+	return a.String()
+}
+
+func (a aErr) String() (s string) {
+
+	s = a.msg
+	if a.err != nil {
+		s = fmt.Sprintf("%s - [ %s ]", s, a.err.Error())
 	}
 
-	return a.err.Error()
+	return s
 }
 
-func (a atomError) String() string {
-	if !validator.Valid(a) {
-		panic("invalid error")
-	}
-
-	return a.err.Error()
-}
-
-func (a atomError) Unwrap() (err error) {
+func (a aErr) Unwrap() (err error) {
 
 	err = a.err
-	if aerr, ok := a.err.(atomError); ok {
+	if aerr, ok := a.err.(aErr); ok {
 		// Recursive unwrap to get the lowest error
 		err = aerr.Unwrap()
 	}
@@ -33,8 +32,8 @@ func (a atomError) Unwrap() (err error) {
 	return err
 }
 
-func (a atomError) Validate() (valid bool) {
-	if a.err != nil {
+func (a aErr) Validate() (valid bool) {
+	if len(a.msg) > 0 {
 		valid = true
 	}
 

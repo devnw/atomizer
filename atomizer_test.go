@@ -62,12 +62,12 @@ func TestAtomizer_Exec(t *testing.T) {
 				}
 			}
 
-			t.Logf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
+			t.Logf("Processing Time Through Atomizer %s\n", time.Since(sent).String())
 		} else {
-			// TODO:
+			t.Error(err)
 		}
 	} else {
-		// TODO:
+		t.Error(err)
 	}
 }
 
@@ -132,7 +132,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 		}()
 
 		wg.Wait()
-		t.Logf("Processing Time Through Atomizer %s\n", time.Now().Sub(sent).String())
+		t.Logf("Processing Time Through Atomizer %s\n", time.Since(sent).String())
 
 	} else {
 		t.Errorf("error while executing harness | %s", err)
@@ -181,7 +181,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		if test.err || (!test.err && test.value != nil) {
 			// TODO: should the error be ignored here?
 			// Store invalid conductor
-			_ = Register(nil, test.value)
+			_ = Register(context.Background(), test.value)
 		}
 
 		mizer := Atomize(context.Background())

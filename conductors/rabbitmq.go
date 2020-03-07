@@ -81,11 +81,10 @@ type rabbitmq struct {
 }
 
 func (r *rabbitmq) Cleanup() {
-	select {
-	case <-r.ctx.Done():
-		// TODO: should the error be ignored here?
-		_ = r.connection.Close()
-	}
+	<-r.ctx.Done()
+
+	// TODO: should the error be ignored here?
+	_ = r.connection.Close()
 }
 
 // Receive gets the atoms from the source that are available to atomize.

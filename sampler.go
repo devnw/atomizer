@@ -50,10 +50,8 @@ func (sampl sampler) sample() {
 							defer cancel()
 						}
 
-						select {
-						case <-subctx.Done():
-							panic("sampler timed out without processing for x minutes")
-						}
+						<-subctx.Done()
+						panic("sampler timed out without processing for x minutes")
 					}
 				}
 				<-time.After(5 * time.Millisecond)
