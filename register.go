@@ -1,124 +1,59 @@
 package atomizer
 
 import (
-	"context"
+	"fmt"
 	"sync"
 
-	"github.com/benjivesterby/alog"
-	"github.com/benjivesterby/validator"
-	"github.com/pkg/errors"
+	"github.com/devnw/validator"
 )
 
-// preRegistrations of atoms and conductors that are loaded using init
-// by libraries utilizing the atomizer
-var preRegistrations sync.Map
-
-// TODO: Should this be a constant?
-var preRegSingleton = sync.Once{}
-var regchan chan interface{}
-
-// Used to get rid of race conditions for shared resources in registration
-var mutty = sync.RWMutex{}
+var registrant sync.Map
 
 // Registrations returns a channel which contains the init pre-registrations
 // for use by the atomizer
-func Registrations(ctx context.Context) <-chan interface{} {
+func Registrations() []interface{} {
+	registrations := make([]interface{}, 0)
 
-	// Initialize the registrations channel
-	mutty.Lock()
-	regchan = make(chan interface{})
-	mutty.Unlock()
+	registrant.Range(func(key, value interface{}) bool {
 
-	// Execute a singleton instance to read the pre-registations from the sync.Map for init registrations
-	// and push those to a channel for use by the receiver
-	preRegSingleton.Do(func() {
-
-		// Push off in go routine so that the channel can be returned immediately
-		go func() {
-
-			// Lock the reads and modifications of the pre-registrations to keep from
-			// having race conditions in the registrations
-			mutty.RLock()
-			preRegistrations.Range(func(key, value interface{}) bool {
-				var ok bool
-
-				alog.Printf("pushing pre-registration %v", key)
-
-				// Pass the value over the channel
-				select {
-				case <-ctx.Done():
-					close(regchan)
-				case regchan <- value:
-					alog.Printf("deleting pre-registration key %v", key)
-
-					// Delete the key from the map to indicate that it's been received
-					preRegistrations.Delete(key)
-
-					ok = true
-				}
-
-				return ok
-			})
-			mutty.RUnlock()
-		}()
+		registrations = append(registrations, value)
+		return true
 	})
-
-	return regchan
+	return registrations
 }
 
 // Register adds entries of different types that are used by the atomizer
 // and allows them to be pre-registered using an init script rather than
 // having them passed in later at run time. This is useful for some situations
 // where the user may not want to register explicitly
-func Register(ctx context.Context, values ...interface{}) (err error) {
+func Register(value interface{}) error {
+	// Validate the value coming into the register method
+	if !validator.Valid(value) {
+		return simple(
+			fmt.Sprintf(
+				"Invalid registration %s",
+				ID(value)),
+			nil,
+		)
 
-	for _, value := range values {
-
-		// Validate the value coming into the register method
-		if validator.IsValid(value) {
-
-			// Type assert the value to ensure we're only registering expected values in the maps
-			switch value.(type) {
-			case Conductor, Atom:
-
-				// If the regchan is valid and initialized then send the value directly to the receiver
-				// this will handle any plugins where init is called at plugin load time so that the
-				// different registrations are handled immediately and the map doesn't have to be monitored
-				// by the registration methods
-				if regchan != nil {
-					select {
-					case <-ctx.Done():
-						err = ctx.Err()
-						return
-					case regchan <- value:
-					}
-				} else {
-
-					// Ensure the key is not being duplicated in the pre-registration map
-					if _, ok := preRegistrations.Load(ID(value)); !ok {
-						preRegistrations.Store(ID(value), value)
-					} else {
-						err = errors.Errorf("cannot register item [%s] because this key is already in use", ID(value))
-					}
-				}
-			default:
-				err = errors.Errorf("cannot register item [%s] because it is not a supported type", ID(value))
-			}
-		} else {
-			err = errors.Errorf("cannot register item [%s] because it is invalid", ID(value))
-		}
 	}
 
-	return err
-}
+	// Type assert the value to ensure we're only
+	// registering expected values in the maps
+	switch value.(type) {
+	case Conductor, Atom:
 
-// Clean clears out the pre-registered values and channels uses for registration
-// this method is primarily for testing and should not be used otherwise
-func Clean() {
+		// Registrations using the same key will
+		// be overridden
+		registrant.Store(ID(value), value)
+	default:
+		return simple(
+			fmt.Sprintf(
+				"unsupported type %s",
+				ID(value)),
+			nil,
+		)
+	}
 
-	mutty.Lock()
-	preRegistrations = sync.Map{}
-	preRegSingleton = sync.Once{}
-	regchan = nil
-	mutty.Unlock()
+	return nil
 }

@@ -4,158 +4,204 @@ import (
 	"context"
 	"time"
 
-	"github.com/benjivesterby/alog"
-	"github.com/benjivesterby/validator"
-	"github.com/pkg/errors"
+	"github.com/devnw/alog"
+	"github.com/devnw/validator"
 )
 
 type instance struct {
-	electron   *Electron
+	electron   Electron
 	conductor  Conductor
 	atom       Atom
 	properties *Properties
+	ctx        context.Context
 	cancel     context.CancelFunc
 
-	// TODO: add an actions channel here that the monitor can keep an eye on for this bonded electron/atom combo
+	// TODO: add an actions channel here that the monitor can keep
+	// an eye on for this bonded electron/atom combo
 }
 
-func (inst *instance) bond(atom Atom) (err error) {
+// bond bonds an instance of an electron with an instance of the
+// corresponding atom in the atomizer registrations such that
+// the execute method of the instance can properly exercise the
+// Process method of the interface
+func (i *instance) bond(atom Atom) (err error) {
 
-	if validator.IsValid(inst.electron) {
-		if validator.IsValid(inst.conductor) {
+	if err = validator.Assert(
+		i.electron,
+		i.conductor,
+		atom,
+	); err != nil {
 
-			// Ensure the atom passed in is valid
-			if validator.IsValid(atom) {
-				inst.atom = atom
-			} else {
-				err = errors.Errorf("invalid atom [%s] when attempting to bond", ID(atom))
-			}
-		} else {
-			err = errors.Errorf("invalid conductor [%s] when attempting to bond", ID(inst.conductor))
+		return Error{
+			Event: Event{
+				Message:    "error while bonding atom instance",
+				AtomID:     ID(atom),
+				ElectronID: i.electron.ID,
+			},
+			Internal: err,
 		}
-	} else {
-		err = errors.Errorf("invalid electron [%s] when attempting to bond", inst.electron.ID)
 	}
+
+	// register the atom internally because
+	// the instance is valid
+	i.atom = atom
+
+	return nil
+}
+
+// setupCtx branches a new context off for use in
+// the instance rather than using the parent context
+// which allows for a cancel to be established for each
+// instance of a bonded atom/electron pair
+func (i *instance) setupCtx(ctx context.Context) (context.Context, error) {
+
+	if err := validator.Assert(i.electron, ctx); err != nil {
+		return nil, Error{
+			Event: Event{
+				Message: "invalid electron in instance",
+				AtomID:  ID(i.atom),
+			},
+			Internal: err,
+		}
+	}
+
+	// Initialize the new context object for the
+	// processing of the electron/atom
+	if i.electron.Timeout != nil {
+
+		// Create a new context for the electron with a timeout
+		i.ctx, i.cancel = _ctxT(
+			ctx,
+			*i.electron.Timeout,
+		)
+	} else {
+		// Create a new context for the electron
+		// with a cancellation option
+		i.ctx, i.cancel = context.WithCancel(ctx)
+	}
+
+	return i.ctx, nil
+}
+
+// complete marks the completion of execution and pushes
+// the results to the conductor
+func (i *instance) complete() error {
+
+	// Set the end time and status in the properties
+	i.properties.End = time.Now()
+
+	// Push the completed instance properties to the conductor
+	return i.conductor.Complete(i.ctx, i.properties)
+}
+
+// execute runs the process method on the bonded atom / electron pair
+func (i *instance) execute(ctx context.Context) error {
+
+	defer func() {
+		err := recInst(
+			ID(i.atom),
+			i.electron.ID,
+		)
+
+		if err != nil {
+			i.properties.Errors = append(
+				i.properties.Errors,
+				err,
+			)
+		}
+	}()
+
+	// ensure the instance is valid before attempting
+	// to execute processing
+	if !validator.Valid(i) {
+
+		return Error{
+			Event: Event{
+				Message:    "instance validation failed",
+				AtomID:     ID(i.atom),
+				ElectronID: i.electron.ID,
+			},
+		}
+	}
+
+	// Establish internal context
+	ctx, err := i.setupCtx(ctx)
+	if err != nil {
+		return Error{
+			Event: Event{
+				Message: "error setting instance ctx",
+			},
+			Internal: err,
+		}
+	}
+
+	i.properties = &Properties{
+		ElectronID: i.electron.ID,
+		AtomID:     ID(i.atom),
+		Start:      time.Now(),
+	}
+
+	// ensure that when this method exits the completion
+	// of this instance takes place and is pushed to the
+	// conductor
+	defer func() {
+		err = i.complete()
+		if err != nil {
+			// TODO: fix this, the errors are not propagating up
+			alog.Error(err)
+		}
+	}()
+
+	alog.Printf("executing electron [%s]\n", i.electron.ID)
+
+	// TODO: Setup with a heartbeat for monitoring processing of the
+	// bonded atom stream in from the process method
+
+	// Execute the process method of the atom
+	i.properties.Result, err = i.atom.Process(ctx, i.conductor, i.electron)
+	if err != nil {
+		i.properties.Errors = append(i.properties.Errors, err)
+	}
+
+	alog.Printf("electron [%s] processed\n", i.electron.ID)
+
+	// TODO: The processing has finished for this bonded atom and the
+	// results need to be calculated and the properties sent back to the
+	// conductor
+
+	// TODO: Ensure a is the proper thing to do here?? I think it needs
+	// to close a out at the conductor rather than here... unless the
+	// conductor overrode the call back
+
+	// TODO: Execute the callback with the notification here?
+	// TODO: determine if this is the correct location or if this is \
+	// something that should be handled purely by the conductor
+
+	// TODO: Handle this properly
+	// if inst.electron.Resp != nil {
+	//	// Drop the return for this electron onto the channel
+	//      // to be sent back to the requester
+	// 	inst.electron.Resp <- inst.properties
+	// }
 
 	return err
 }
 
-// execute runs the process method on the bonded atom / electron pair
-func (inst *instance) execute(ctx context.Context) {
-
-	if validator.IsValid(inst) {
-
-		// Initialize the new context object for the processing of the electron/atom
-		if inst.electron.Timeout != nil {
-			// Create a new context for the electron with a timeout
-			ctx, inst.cancel = context.WithTimeout(ctx, *inst.electron.Timeout)
-		} else {
-			// Create a new context for the electron with a cancellation option
-			ctx, inst.cancel = context.WithCancel(ctx)
-		}
-
-		inst.properties = &Properties{
-			ElectronID: inst.electron.ID,
-			AtomID:     ID(inst.atom),
-			Start:      time.Now(),
-		}
-
-		// Setup defer for this instance
-		defer func() {
-			if r := recover(); r != nil {
-				inst.properties.Error = errors.Errorf(
-					"panic in processing of electron [%s] | panic: [%s] | error:[%s]",
-					inst.electron.ID,
-					r,
-					inst.properties.Error,
-				)
-			}
-
-			// Set the end time and status in the properties
-			inst.properties.End = time.Now()
-
-			if err := inst.conductor.Complete(ctx, inst.properties); err == nil {
-				alog.Printf("completed electron [%s]\n", inst.electron.ID)
-			} else {
-				alog.Errorf(err, "error marking electron [%s] as complete", inst.electron.ID)
-			}
-		}()
-
-		alog.Printf("executing electron [%s]\n", inst.electron.ID)
-
-		// TODO: Setup with a heartbeat for monitoring processing of the bonded atom
-		// stream in from the process method
-		// Execute the process method of the atom
-		inst.properties.Result, inst.properties.Error = inst.atom.Process(ctx, inst.conductor, inst.electron)
-		alog.Printf("electron [%s] processed\n", inst.electron.ID)
-
-		// TODO: The processing has finished for this bonded atom and the results need to be calculated and the properties sent back to the
-		// conductor
-
-		// TODO: Ensure mizer is the proper thing to do here?? I think it needs to close mizer out
-		//  at the conductor rather than here... unless the conductor overrode the call back
-
-		// TODO: Execute the callback with the notification here?
-		// TODO: determine if this is the correct location or if this is something that should be handled purely by the conductor
-		// TODO: Handle this properly
-		// if inst.electron.Resp != nil {
-		// 	// Drop the return for this electron onto the channel to be sent back to the requester
-		// 	inst.electron.Resp <- inst.properties
-		// }
-
-	} else {
-		// TODO: invalid
-	}
+// Cancel the instance context
+func (i *instance) Cancel() (err error) {
+	return wrapcancel(i.cancel)
 }
 
-// func (inst *instance) outbound(ctx context.Context) chan<- Electron {
-// 	electrons := make(chan Electron)
+// Validate ensures that the instance has the correct
+// non-nil values internally so that it functions properly
+func (i *instance) Validate() (valid bool) {
 
-// 	go func(electrons chan Electron) {
-// 		defer close(electrons)
+	if i != nil {
+		if validator.Valid(
+			i.electron,
+			i.conductor,
+			i.atom) {
 
-// 		for {
-// 			select {
-// 			case <-ctx.Done():
-// 				return
-// 			case e, ok := <-electrons:
-// 				if ok {
-// 					// Push the electron to the conductor
-// 					if err := inst.conductor.Send(ctx, e); err != nil && e.Respond() != nil {
-// 						select {
-// 						case e.Respond() <- &Properties{
-// 							ElectronID: e.ID(),
-// 							AtomID:     e.AID(),
-// 							Error:      err,
-// 						}:
-// 							alog.Errorf(err, "error occurred while sending outbound electron [%s]", e.ID())
-// 						}
-// 					}
-// 				} else {
-// 					return
-// 				}
-// 			}
-// 		}
-
-// 	}(electrons)
-
-// 	return electrons
-// }
-
-func (inst *instance) Properties() *Properties {
-	return inst.properties
-}
-
-func (inst *instance) Cancel() (err error) {
-	return wrapcancel(inst.cancel)
-}
-
-func (inst *instance) Validate() (valid bool) {
-
-	if validator.IsValid(inst.electron) &&
-		validator.IsValid(inst.conductor) &&
-		validator.IsValid(inst.atom) {
-		{
 			valid = true
 		}
 	}

@@ -1,0 +1,105 @@
+package atomizer
+
+import (
+	"testing"
+
+	"github.com/pkg/errors"
+)
+
+func TestError_Error(t *testing.T) {
+	prefix := "atomizer error"
+
+	tests := []struct {
+		name     string
+		e        error
+		expected string
+	}{
+		{
+			"error w/message test",
+			Error{
+				Event: Event{
+					Message: "test",
+				},
+			},
+			prefix + " test",
+		},
+		{
+			"error w/empty message test",
+			Error{
+				Event: Event{},
+			},
+			prefix,
+		},
+		{
+			"error w/inner error test",
+			Error{
+				Internal: Error{
+					Event: Event{
+						Message: "test",
+					},
+				},
+			},
+			prefix + " | internal: (atomizer error test)",
+		},
+		{
+			"error w/multiple inner error test",
+			Error{
+				Internal: Error{
+					Event: Event{
+						Message: "test",
+					},
+					Internal: Error{
+						Event: Event{
+							Message: "test 2",
+						},
+					},
+				},
+			},
+			prefix + " | internal: (atomizer error test" +
+				" | internal: (atomizer error test 2))",
+		},
+		{
+			"simple error test",
+			simple("test", nil),
+			prefix + " test",
+		},
+		{
+			"simple error w/inner test",
+			simple(
+				"test",
+				simple("inner", nil),
+			),
+			prefix + " test | internal: (atomizer error inner)",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := test.e.Error()
+			if result != test.expected {
+				t.Errorf(
+					"expected [%s] got [%s]",
+					test.expected,
+					result,
+				)
+			}
+		})
+	}
+}
+
+func TestError_Unwrap(t *testing.T) {
+
+	e := errors.New("wrapped error")
+
+	aerr := Error{
+		Internal: e,
+	}
+
+	if aerr.Unwrap() != e {
+		t.Errorf(
+			"expected [%v] got [%v]",
+			e,
+			aerr.Unwrap(),
+		)
+	}
+}
