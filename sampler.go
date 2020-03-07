@@ -19,15 +19,16 @@ type sampler struct {
 	cancel  context.CancelFunc
 }
 
-func (sampl sampler) sample() {
+func (s sampler) sample() {
 
 	go func() {
+		defer s.cancel()
 
 		var subctx context.Context
 
 		for {
 			select {
-			case <-sampl.ctx.Done():
+			case <-s.ctx.Done():
 				return
 			default:
 				if v, err := mem.VirtualMemory(); err == nil {
@@ -39,14 +40,14 @@ func (sampl sampler) sample() {
 
 						//establishes to wait if the used memory percentage is at a set amount
 						select {
-						case <-sampl.ctx.Done():
+						case <-s.ctx.Done():
 							return
-						case sampl.process <- true:
+						case s.process <- true:
 						}
 					} else {
 						if subctx == nil {
 							var cancel context.CancelFunc
-							subctx, cancel = context.WithTimeout(sampl.ctx, time.Second*300)
+							subctx, cancel = context.WithTimeout(s.ctx, time.Second*300)
 							defer cancel()
 						}
 
@@ -61,8 +62,8 @@ func (sampl sampler) sample() {
 
 }
 
-func (sampl sampler) Wait() {
-	sampl.once.Do(sampl.sample)
+func (s sampler) Wait() {
+	s.once.Do(s.sample)
 	// Block on the channel
-	<-sampl.process
+	<-s.process
 }

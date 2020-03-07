@@ -128,24 +128,24 @@ func (a *atomizer) event(event string) {
 
 // Initialize the go routines that will read from the conductors concurrently while other parts of the
 // atomizer reads in the inputs and executes the instances of electrons
-func (a *atomizer) receive(externalRegistations <-chan interface{}) (err error) {
+func (a *atomizer) receive(external <-chan interface{}) (err error) {
 	// Initialize the registrations channel if it's nil
 	if a.registrations == nil {
 		a.registrations = make(chan interface{})
 	}
 
-	go func() {
+	go func(ext <-chan interface{}, reg chan interface{}) {
 		// TODO: handle panics and re-init
-		go func() {
+		defer func() {
 			if r := recover(); r != nil {
-
+				a.error(aErr{errors.Errorf("%s", r), "panic in atomizer receive"})
 			}
 		}()
 
-		// TODO: Self-heal with heartbeats
-
 		// Close the registrations channel
-		defer close(a.registrations)
+		defer close(reg)
+
+		// TODO: Self-heal with heartbeats
 
 		// Cancel out the atomizer in the event of a panic at the receiver because
 		// this cannot be effectively restarted without creating an inconsistent state
@@ -157,18 +157,18 @@ func (a *atomizer) receive(externalRegistations <-chan interface{}) (err error) 
 				return
 
 			// Handle the external-registrations
-			case registration, ok := <-externalRegistations:
+			case registration, ok := <-ext:
 				if ok {
 					if err := a.register(registration); err != nil {
 						a.error(err)
 					}
 				} else {
 					// channel closed
-					panic("unexpected closing of the externalRegistations channel in the atomizer")
+					panic("unexpected closing of the external registrations channel in the atomizer")
 				}
 
 			// Handle the real-time registrations
-			case registration, ok := <-a.registrations:
+			case registration, ok := <-reg:
 				if ok {
 					if err := a.register(registration); err != nil {
 						a.error(err)
@@ -179,7 +179,7 @@ func (a *atomizer) receive(externalRegistations <-chan interface{}) (err error) 
 				}
 			}
 		}
-	}()
+	}(external, a.registrations)
 
 	return err
 }
