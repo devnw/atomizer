@@ -12,7 +12,7 @@ require (
 	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/google/uuid v1.1.1
 	github.com/pkg/errors v0.9.1
-	github.com/shirou/gopsutil v2.20.2+incompatible
+	github.com/shirou/gopsutil v2.20.3+incompatible
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271
 	golang.org/x/net v0.0.0-20191003171128-d98b1b443823 // indirect
 	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect
