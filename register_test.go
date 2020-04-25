@@ -8,58 +8,55 @@ type invalidTestStruct struct{}
 
 func TestRegister(t *testing.T) {
 
-	Clean()
-	defer Clean()
-
 	tests := []struct {
-		title string
+		name  string
 		key   string
 		value interface{}
 		err   bool
 	}{
-		{ // Valid test
-			"ValidTest",
-			"atomizer.passthrough",
-			&passthrough{input: make(chan *Electron)},
+		{
+			"valid conductor registration",
+			ID(noopconductor{}),
+			&noopconductor{},
 			false,
 		},
-		{ // Invalid test because value is nil
-			"NilRegistrationTest",
-			"nil",
+		{
+			"valid atom registration",
+			ID(noopatom{}),
+			&noopatom{},
+			false,
+		},
+		{
+			"invalid nil registration",
+			"",
 			nil,
 			true,
 		},
-		{ // Invalid test because value is nil
-			"InvalidTypeTest",
-			"atomizer.invalidTestStruct",
+		{
+			"invalid interface registration",
+			ID(invalidTestStruct{}),
 			invalidTestStruct{},
 			true,
 		},
 	}
 
 	for _, test := range tests {
-		if err := Register(nil, test.value); err == nil {
-			if value, ok := preRegistrations.Load(test.key); ok {
-				if _, ok := value.(*passthrough); ok {
-					if test.err {
-						t.Errorf("Test key [%s] failed because expected a failure but got success", test.key)
-					}
-				} else {
-					t.Errorf("Test key [%s] failed because returned value failed type assertion", test.key)
-				}
-			} else {
-				t.Errorf("Test key [%s] failed to load value from sync map", test.key)
+		t.Run(test.name, func(t *testing.T) {
+			reset()
+			defer reset()
+
+			err := Register(test.value)
+			if err != nil && !test.err {
+				t.Error(err)
 			}
-		} else if err != nil && !test.err {
-			t.Error(err)
-		}
+
+			_, ok := registrant.Load(test.key)
+			if !ok && !test.err {
+				t.Errorf(
+					"Test key [%s] failed to load",
+					test.key,
+				)
+			}
+		})
 	}
-}
-
-func TestRegisterSource(t *testing.T) {
-
-}
-
-func TestRegisterAtom(t *testing.T) {
-
 }

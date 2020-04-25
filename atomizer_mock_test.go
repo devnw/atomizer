@@ -7,30 +7,69 @@ import (
 	"sync"
 
 	"github.com/Pallinder/go-randomdata"
-	"github.com/benjivesterby/validator"
+	"github.com/devnw/alog"
+	"github.com/devnw/validator"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
 
 type tresult struct {
 	result   string
-	electron *Electron
-	err      bool
-	panic    bool
+	electron Electron
+	// err      bool
+	// panic    bool
+}
+
+var noopelectron = Electron{
+	SenderID: "empty",
+	ID:       "empty",
+	AtomID:   "empty",
 }
 
 type invalidconductor struct{}
 
+type noopconductor struct{}
+
+func (*noopconductor) Receive(ctx context.Context) <-chan Electron {
+	return nil
+}
+
+func (*noopconductor) Send(
+	ctx context.Context,
+	electron Electron,
+) (<-chan *Properties, error) {
+	return nil, nil
+}
+
+func (*noopconductor) Close() {}
+
+func (*noopconductor) Complete(
+	ctx context.Context,
+	properties *Properties,
+) error {
+	return nil
+}
+
+type noopatom struct{}
+
+func (*noopatom) Process(
+	ctx context.Context,
+	conductor Conductor,
+	electron Electron,
+) ([]byte, error) {
+	return nil, nil
+}
+
 type validconductor struct {
-	echan chan *Electron
+	echan chan Electron
 	valid bool
 }
 
-func (cond *validconductor) Receive(ctx context.Context) <-chan *Electron {
+func (cond *validconductor) Receive(ctx context.Context) <-chan Electron {
 	return cond.echan
 }
 
-func (cond *validconductor) Send(ctx context.Context, electron *Electron) (response <-chan *Properties, err error) {
+func (cond *validconductor) Send(ctx context.Context, electron Electron) (response <-chan *Properties, err error) {
 	return response, err
 }
 
@@ -46,51 +85,52 @@ func (cond *validconductor) Close() {}
 
 // TODO: Move passthrough as a conductor implementation for in-node processing
 type passthrough struct {
-	input   chan *Electron
+	input   chan Electron
 	results sync.Map
 }
 
-func (pt *passthrough) Receive(ctx context.Context) <-chan *Electron {
+func (pt *passthrough) Receive(ctx context.Context) <-chan Electron {
 	return pt.input
 }
 
-func (pt *passthrough) Validate() (valid bool) { return pt.input != nil }
+func (pt *passthrough) Validate() bool { return pt.input != nil }
 
-func (pt *passthrough) Complete(ctx context.Context, properties *Properties) (err error) {
-	if validator.IsValid(properties) {
-		// for rabbit mq drop properties onto the /basepath/electronid message path
-		if value, ok := pt.results.Load(properties.ElectronID); ok {
-			if value != nil {
-				if resultChan, ok := value.(chan *Properties); ok {
-					defer close(resultChan)
-
-					// Push the properties of the instance onto the channel
-					select {
-					case <-ctx.Done():
-						return
-					case resultChan <- properties:
-					}
-				} else {
-					err = errors.New("unable to type assert electron properties channel")
-				}
-			} else {
-				err = errors.Errorf("nil properties channel returned for electron [%s]", properties.ElectronID)
-			}
-		} else {
-			err = errors.Errorf("unable to load properties channel from sync map for electron [%s]", properties.ElectronID)
-		}
-	} else {
-		err = errors.Errorf("invalid properties returned for electron [%s]", properties.ElectronID)
+func (pt *passthrough) Complete(ctx context.Context, properties *Properties) error {
+	if !validator.Valid(properties) {
+		return errors.Errorf("invalid properties returned for electron [%s]", properties.ElectronID)
 	}
 
-	return err
+	// for rabbit mq drop properties onto the /basepath/electronid message path
+	value, ok := pt.results.Load(properties.ElectronID)
+	if !ok {
+		return errors.Errorf("unable to load properties channel from sync map for electron [%s]", properties.ElectronID)
+	}
+
+	if value == nil {
+		return errors.Errorf("nil properties channel returned for electron [%s]", properties.ElectronID)
+	}
+
+	resultChan, ok := value.(chan *Properties)
+	if !ok {
+		return errors.New("unable to type assert electron properties channel")
+	}
+
+	defer close(resultChan)
+
+	// Push the properties of the instance onto the channel
+	select {
+	case <-ctx.Done():
+		return nil
+	case resultChan <- properties:
+	}
+	return nil
 }
 
-func (pt *passthrough) Send(ctx context.Context, electron *Electron) (<-chan *Properties, error) {
+func (pt *passthrough) Send(ctx context.Context, electron Electron) (<-chan *Properties, error) {
 	var err error
 	result := make(chan *Properties)
 
-	if validator.IsValid(electron) {
+	if validator.Valid(electron) {
 		go func(result chan *Properties) {
 
 			// Only kick off the electron for processing if there isn't already an
@@ -107,7 +147,7 @@ func (pt *passthrough) Send(ctx context.Context, electron *Electron) (<-chan *Pr
 			} else {
 				defer close(result)
 				p := &Properties{}
-				p.Error = errors.Errorf("duplicate electron registration for EID [%s]", electron.ID)
+				alog.Errorf(nil, "duplicate electron registration for EID [%s]", electron.ID)
 
 				result <- p
 			}
@@ -121,9 +161,9 @@ func (pt *passthrough) Close() {}
 
 type printer struct{}
 
-func (p *printer) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
+func (p *printer) Process(ctx context.Context, conductor Conductor, electron Electron) (result []byte, err error) {
 
-	if validator.IsValid(electron) {
+	if validator.Valid(electron) {
 		var payload printerdata
 
 		if err = json.Unmarshal(electron.Payload, &payload); err == nil {
@@ -135,32 +175,37 @@ func (p *printer) Process(ctx context.Context, conductor Conductor, electron *El
 	return result, err
 }
 
-type bench struct{}
-
-func (b *bench) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
-	return result, err
-}
-
 type returner struct{}
 
-func (b *returner) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
+func (b *returner) Process(ctx context.Context, conductor Conductor, electron Electron) (result []byte, err error) {
 
-	if validator.IsValid(electron) {
-		var payload printerdata
-
-		if err = json.Unmarshal(electron.Payload, &payload); err == nil {
-			result = []byte(payload.Message)
-		}
+	if !validator.Valid(electron) {
+		return nil, errors.New("invalid electron")
 	}
+
+	var payload = &printerdata{}
+	err = json.Unmarshal(electron.Payload, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	result = []byte(payload.Message)
+	alog.Println("returning payload")
 
 	return result, err
 }
 
 func spawnReturner(size int) (tests []*tresult) {
+
+	tests = make([]*tresult, 0, size)
+
 	for i := 0; i < size; i++ {
 		msg := randomdata.SillyName()
 
-		e, _ := newElectron("atomizer.returner", []byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)))
+		e := newElectron(
+			ID(returner{}),
+			[]byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)),
+		)
 
 		tests = append(tests, &tresult{
 			result:   msg,
@@ -175,52 +220,48 @@ type printerdata struct {
 	Message string `json:"message"`
 }
 
-func newElectron(atomID string, payload []byte) (electron *Electron, err error) {
-
-	id := uuid.New()
-
-	electron = &Electron{
+func newElectron(atomID string, payload []byte) Electron {
+	return Electron{
 		SenderID: uuid.New().String(),
-		ID:       id.String(),
+		ID:       uuid.New().String(),
 		AtomID:   atomID,
 		Payload:  payload,
 	}
-
-	return electron, err
 }
 
 // harness creates a valid atomizer that uses the passthrough conductor
-func harness(ctx context.Context) (c Conductor, err error) {
+func harness(
+	ctx context.Context,
+	events chan interface{},
+) (Conductor, error) {
+
 	pass := &passthrough{
-		input: make(chan *Electron),
+		input: make(chan Electron, 1),
 	}
 
-	if validator.IsValid(pass) {
-
-		// Register the conductor so it's picked up when the atomizer is initialized
-		if err = Register(ctx, pass); err == nil {
-
-			// Register the atom so that it's there for processing requests from the conductor
-			if err = Register(ctx, &printer{}); err == nil {
-
-				// Register the benchmark atom for the benchmark tests
-				if err = Register(ctx, &bench{}); err == nil {
-
-					// Register the benchmark atom for the benchmark tests
-					if err = Register(ctx, &returner{}); err == nil {
-
-						// Initialize the atomizer
-						mizer := Atomize(ctx)
-
-						// Start the execution threads
-						if err = mizer.Exec(); err == nil {
-							c = pass
-						}
-					}
-				}
-			}
-		}
+	// Register the conductor so it's picked up
+	// when the atomizer is initialized
+	if err := Register(pass); err != nil {
+		return nil, err
 	}
 
-	return c, err
+	// Test Atom registrations
+
+	if err := Register(&printer{}); err != nil {
+		return nil, err
+	}
+
+	if err := Register(&noopatom{}); err != nil {
+		return nil, err
+	}
+
+	if err := Register(&returner{}); err != nil {
+		return nil, err
+	}
+
+	// Initialize the atomizer
+	a, _ := Atomize(ctx, events).(*atomizer)
+
+	// Start the execution threads
+	return pass, a.Exec()
 }

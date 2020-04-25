@@ -1,42 +1,90 @@
 package atomizer
 
-import "github.com/benjivesterby/validator"
+import (
+	"encoding/gob"
+	"fmt"
+	"strings"
+)
 
-type atomError struct {
-	err error
+func init() {
+	gob.Register(Error{})
 }
 
-func (a atomError) Error() string {
-	if !validator.Valid(a) {
-		panic("invalid error")
+type wrappedErr interface {
+	Unwrap() error
+}
+
+func simple(msg string, internal error) error {
+	return Error{
+		Event: Event{
+			Message: msg,
+		},
+		Internal: internal,
+	}
+}
+
+// ptoe takes a result of a recover and coverts it
+// to a string
+func ptoe(r interface{}) error {
+	return Error{
+		Event: makeEvent(ptos(r)),
+	}
+}
+
+// ptos takes a result of a recover and coverts it
+// to a string
+func ptos(r interface{}) string {
+	return fmt.Sprintf("%v", r)
+}
+
+// Error is an error type which provides specific
+// atomizer information as part of an error
+type Error struct {
+
+	// Event is the event that took place to create
+	// the error and contains metadata relevant to the error
+	Event Event `json:"event"`
+
+	// Internal is the internal error
+	Internal error `json:"internal"`
+}
+
+func (e Error) Error() string {
+	return e.String()
+}
+
+func (e Error) String() string {
+	var fields []string
+
+	fields = append(fields, "atomizer error")
+
+	msg := e.Event.String()
+	if msg != "" {
+		fields = append(fields, msg)
 	}
 
-	return a.err.Error()
-}
-
-func (a atomError) String() string {
-	if !validator.Valid(a) {
-		panic("invalid error")
+	if e.Internal != nil {
+		fields = append(
+			fields,
+			"| internal: ("+e.Internal.Error()+")",
+		)
 	}
 
-	return a.err.Error()
+	return strings.Join(fields, " ")
 }
 
-func (a atomError) Unwrap() (err error) {
+func (e Error) Unwrap() (err error) {
 
-	err = a.err
-	if aerr, ok := a.err.(atomError); ok {
+	err = e.Internal
+
+	// Determine if the internal error implements
+	// the wrappedErr interface then continue unwrapping
+	// if it does
+	if internal, ok := err.(wrappedErr); ok {
+
 		// Recursive unwrap to get the lowest error
-		err = aerr.Unwrap()
+		err = internal.Unwrap()
 	}
 
 	return err
-}
-
-func (a atomError) Validate() (valid bool) {
-	if a.err != nil {
-		valid = true
-	}
-
-	return valid
 }
