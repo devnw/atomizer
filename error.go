@@ -73,6 +73,7 @@ func (e Error) String() string {
 	return strings.Join(fields, " ")
 }
 
+// Unwrap unwraps the error to the deepest error and returns that one
 func (e Error) Unwrap() (err error) {
 
 	err = e.Internal
@@ -87,4 +88,9 @@ func (e Error) Unwrap() (err error) {
 	}
 
 	return err
+}
+
+// Validate determines if this is a properly built error
+func (e Error) Validate() bool {
+	return e.Event.Validate()
 }

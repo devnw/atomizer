@@ -224,12 +224,12 @@ func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
 
 				err.Internal = conductor.Complete(
 					ctx,
-					&Properties{
+					Properties{
 						ElectronID: e.ID,
 						AtomID:     e.AtomID,
 						Start:      time.Now(),
 						End:        time.Now(),
-						Errors:     []error{err},
+						Error:      err,
 						Result:     nil,
 					},
 				)

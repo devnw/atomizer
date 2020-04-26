@@ -12,10 +12,37 @@ import (
 // processing of an atom has completed so that it can be sent to the
 // original requestor
 type Properties struct {
-	ElectronID string          `json:"electronId"`
-	AtomID     string          `json:"atomId"`
-	Start      time.Time       `json:"starttime"`
-	End        time.Time       `json:"endtime"`
-	Errors     []error         `json:"errors"`
-	Result     json.RawMessage `json:"result"`
+	ElectronID string
+	AtomID     string
+	Start      time.Time
+	End        time.Time
+	Error      error
+	Result     []byte
+}
+
+// UnmarshalJSON reads in a []byte of JSON data and maps it to the Properties
+// struct properly for use throughout Atomizer
+func (p *Properties) UnmarshalJSON(data []byte) error {
+	jsonP := struct {
+		ElectronID string          `json:"electronId"`
+		AtomID     string          `json:"atomId"`
+		Start      time.Time       `json:"starttime"`
+		End        time.Time       `json:"endtime"`
+		Error      error           `json:"errors,omitempty"`
+		Result     json.RawMessage `json:"result"`
+	}{}
+
+	err := json.Unmarshal(data, &jsonP)
+	if err != nil {
+		return err
+	}
+
+	p.ElectronID = jsonP.ElectronID
+	p.AtomID = jsonP.AtomID
+	p.Start = jsonP.Start
+	p.End = jsonP.End
+	p.Error = jsonP.Error
+	p.Result = []byte(jsonP.Result)
+
+	return nil
 }

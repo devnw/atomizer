@@ -78,3 +78,8 @@ func makeEvent(msg string) Event {
 		Message: msg,
 	}
 }
+
+// Validate determines if the event is valid
+func (e Event) Validate() bool {
+	return e.Message != ""
+}

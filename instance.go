@@ -91,23 +91,18 @@ func (i *instance) complete() error {
 	i.properties.End = time.Now()
 
 	// Push the completed instance properties to the conductor
-	return i.conductor.Complete(i.ctx, i.properties)
+	return i.conductor.Complete(i.ctx, *i.properties)
 }
 
 // execute runs the process method on the bonded atom / electron pair
 func (i *instance) execute(ctx context.Context) error {
 
 	defer func() {
-		err := recInst(
+		if err := recInst(
 			ID(i.atom),
 			i.electron.ID,
-		)
-
-		if err != nil {
-			i.properties.Errors = append(
-				i.properties.Errors,
-				err,
-			)
+		); err != nil {
+			i.properties.Error = err
 		}
 	}()
 
@@ -158,10 +153,8 @@ func (i *instance) execute(ctx context.Context) error {
 	// bonded atom stream in from the process method
 
 	// Execute the process method of the atom
-	i.properties.Result, err = i.atom.Process(ctx, i.conductor, i.electron)
-	if err != nil {
-		i.properties.Errors = append(i.properties.Errors, err)
-	}
+	i.properties.Result, i.properties.Error = i.atom.Process(
+		ctx, i.conductor, i.electron)
 
 	alog.Printf("electron [%s] processed\n", i.electron.ID)
 

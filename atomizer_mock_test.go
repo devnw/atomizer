@@ -37,7 +37,7 @@ func (*noopconductor) Receive(ctx context.Context) <-chan Electron {
 func (*noopconductor) Send(
 	ctx context.Context,
 	electron Electron,
-) (<-chan *Properties, error) {
+) (<-chan Properties, error) {
 	return nil, nil
 }
 
@@ -45,7 +45,7 @@ func (*noopconductor) Close() {}
 
 func (*noopconductor) Complete(
 	ctx context.Context,
-	properties *Properties,
+	properties Properties,
 ) error {
 	return nil
 }
@@ -69,7 +69,7 @@ func (cond *validconductor) Receive(ctx context.Context) <-chan Electron {
 	return cond.echan
 }
 
-func (cond *validconductor) Send(ctx context.Context, electron Electron) (response <-chan *Properties, err error) {
+func (cond *validconductor) Send(ctx context.Context, electron Electron) (response <-chan Properties, err error) {
 	return response, err
 }
 
@@ -77,7 +77,7 @@ func (cond *validconductor) Validate() (valid bool) {
 	return cond.valid && cond.echan != nil
 }
 
-func (cond *validconductor) Complete(ctx context.Context, properties *Properties) (err error) {
+func (cond *validconductor) Complete(ctx context.Context, properties Properties) (err error) {
 	return err
 }
 
@@ -95,7 +95,7 @@ func (pt *passthrough) Receive(ctx context.Context) <-chan Electron {
 
 func (pt *passthrough) Validate() bool { return pt.input != nil }
 
-func (pt *passthrough) Complete(ctx context.Context, properties *Properties) error {
+func (pt *passthrough) Complete(ctx context.Context, properties Properties) error {
 	if !validator.Valid(properties) {
 		return errors.Errorf("invalid properties returned for electron [%s]", properties.ElectronID)
 	}
@@ -110,7 +110,7 @@ func (pt *passthrough) Complete(ctx context.Context, properties *Properties) err
 		return errors.Errorf("nil properties channel returned for electron [%s]", properties.ElectronID)
 	}
 
-	resultChan, ok := value.(chan *Properties)
+	resultChan, ok := value.(chan Properties)
 	if !ok {
 		return errors.New("unable to type assert electron properties channel")
 	}
@@ -126,12 +126,12 @@ func (pt *passthrough) Complete(ctx context.Context, properties *Properties) err
 	return nil
 }
 
-func (pt *passthrough) Send(ctx context.Context, electron Electron) (<-chan *Properties, error) {
+func (pt *passthrough) Send(ctx context.Context, electron Electron) (<-chan Properties, error) {
 	var err error
-	result := make(chan *Properties)
+	result := make(chan Properties)
 
 	if validator.Valid(electron) {
-		go func(result chan *Properties) {
+		go func(result chan Properties) {
 
 			// Only kick off the electron for processing if there isn't already an
 			// instance loaded in the system
@@ -146,7 +146,7 @@ func (pt *passthrough) Send(ctx context.Context, electron Electron) (<-chan *Pro
 				}
 			} else {
 				defer close(result)
-				p := &Properties{}
+				p := Properties{}
 				alog.Errorf(nil, "duplicate electron registration for EID [%s]", electron.ID)
 
 				result <- p

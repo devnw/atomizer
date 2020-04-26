@@ -88,13 +88,8 @@ func TestAtomizer_Exec(t *testing.T) {
 			return
 		}
 
-		if len(result.Errors) > 0 {
-
-			for _, e := range result.Errors {
-				// TODO: see if this works with the error lis
-				t.Error("Errors returned from atom", e)
-			}
-
+		if result.Error != nil {
+			t.Error("Errors returned from atom", e)
 			return
 		}
 
@@ -149,7 +144,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 
 			t.Logf("[%v] tests loaded", len(tests))
 
-			results := make(chan *Properties)
+			results := make(chan Properties)
 
 			go func() {
 
@@ -161,7 +156,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 
 						var err error
 
-						var result <-chan *Properties
+						var result <-chan Properties
 						// Send the electron onto the conductor
 						if result, err = conductor.Send(ctx, test.electron); err == nil {
 
@@ -170,7 +165,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 								return
 							case result, ok := <-result:
 								if ok {
-									if len(result.Errors) == 0 {
+									if result.Error == nil {
 
 										if validator.Valid(result.Result) {
 											res := string(result.Result)
@@ -181,7 +176,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 											t.Error("results length is not 1")
 										}
 									} else {
-										t.Error("Error returned from atom", result.Errors)
+										t.Error("Error returned from atom", result.Error)
 									}
 								} else {
 									t.Error("result channel closed, test failed")
@@ -423,7 +418,7 @@ func BenchmarkAtomizer_Exec_Single(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			e := newElectron("atomizer.noopatom", nil)
 
-			var result <-chan *Properties
+			var result <-chan Properties
 			// Send the electron onto the conductor
 			if result, err = conductor.Send(ctx, e); err == nil {
 
@@ -434,8 +429,8 @@ func BenchmarkAtomizer_Exec_Single(b *testing.B) {
 				case result, ok := <-result:
 					if ok {
 						fmt.Printf("Step [%v]\n", n)
-						if len(result.Errors) > 0 {
-							b.Error("Error returned from atom", result.Errors)
+						if result.Error != nil {
+							b.Error("Error returned from atom", result.Error)
 						}
 					} else {
 						b.Error("result channel closed, test failed")
