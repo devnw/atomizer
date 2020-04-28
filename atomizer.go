@@ -241,6 +241,7 @@ func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
 			a.event(Event{
 				Message:     "electron received",
 				ElectronID:  e.ID,
+				AtomID:      e.AtomID,
 				ConductorID: ID(conductor),
 			})
 
@@ -256,6 +257,7 @@ func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
 				a.event(Event{
 					Message:     "electron distributed",
 					ElectronID:  e.ID,
+					AtomID:      e.AtomID,
 					ConductorID: ID(conductor),
 				})
 			}
@@ -333,6 +335,13 @@ func (a *atomizer) _split(
 				return
 			}
 
+			a.event(Event{
+				Message:     "new instance of electron",
+				ElectronID:  inst.electron.ID,
+				AtomID:      ID(atom),
+				ConductorID: ID(inst.conductor),
+			})
+
 			// TODO: implement the processing push
 			// TODO: after the processing has started
 			// push to instances channel for monitoring
@@ -346,13 +355,6 @@ func (a *atomizer) _split(
 				reflect.TypeOf(atom).Elem(),
 			)
 
-			a.event(Event{
-				Message:     "new instance of electron",
-				ElectronID:  inst.electron.ID,
-				AtomID:      ID(atom),
-				ConductorID: ID(inst.conductor),
-			})
-
 			a.exec(ctx, inst, newAtom)
 		}
 	}
@@ -363,6 +365,11 @@ func (a *atomizer) exec(
 	inst instance,
 	newAtom reflect.Value,
 ) {
+	//defer func() {
+	//	fmt.Println("CANCELLED")
+	//	inst.Cancel()
+	//}()
+
 	// TODO: Handler here
 	// Type assert the new copy of the atom to an atom so that it can
 	// be used for processing and returned as a pointer for bonding
@@ -452,7 +459,7 @@ func (a *atomizer) distribute() {
 
 				// TODO: panic here because atomizer can't
 				// work without electron distribution
-				defer a.cancel()
+				a.cancel()
 				return
 			}
 
@@ -474,6 +481,13 @@ func (a *atomizer) distribute() {
 				})
 				continue
 			}
+
+			a.event(Event{
+				Message:     "pushing electron to atom",
+				ElectronID:  inst.electron.ID,
+				AtomID:      inst.electron.AtomID,
+				ConductorID: ID(inst.conductor),
+			})
 
 			select {
 			case <-a.ctx.Done():

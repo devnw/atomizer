@@ -177,12 +177,12 @@ func (i *instance) execute(ctx context.Context) error {
 	// 	inst.electron.Resp <- inst.properties
 	// }
 
-	return err
+	return nil
 }
 
 // Cancel the instance context
-func (i *instance) Cancel() (err error) {
-	return wrapcancel(i.cancel)
+func (i *instance) Cancel() {
+	i.cancel()
 }
 
 // Validate ensures that the instance has the correct

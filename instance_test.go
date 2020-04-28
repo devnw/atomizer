@@ -223,34 +223,6 @@ func Test_instance_execute(t *testing.T) {
 
 }
 
-func Test_instance_Cancel(t *testing.T) {
-
-	var cancelled bool
-
-	i := instance{
-		cancel: func() {
-			cancelled = true
-		},
-	}
-
-	err := i.Cancel()
-	if err != nil || !cancelled {
-		t.Error("failed execution of cancel")
-	}
-}
-
-func Test_instance_NilCancel(t *testing.T) {
-
-	i := instance{
-		cancel: nil,
-	}
-
-	err := i.Cancel()
-	if err == nil {
-		t.Error("expected error from nil cancel")
-	}
-}
-
 func Test_instance_Validate(t *testing.T) {
 
 	tests := []struct {

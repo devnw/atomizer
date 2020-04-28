@@ -46,3 +46,22 @@ func (p *Properties) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
+
+// MarshalJSON implements the custom json marshaler for properties
+func (p *Properties) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ElectronID string          `json:"electronId"`
+		AtomID     string          `json:"atomId"`
+		Start      time.Time       `json:"starttime"`
+		End        time.Time       `json:"endtime"`
+		Error      error           `json:"errors,omitempty"`
+		Result     json.RawMessage `json:"result"`
+	}{
+		ElectronID: p.ElectronID,
+		AtomID:     p.AtomID,
+		Start:      p.Start,
+		End:        p.End,
+		Error:      p.Error,
+		Result:     json.RawMessage(p.Result),
+	})
+}
