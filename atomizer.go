@@ -1,3 +1,8 @@
+// Copyright © 2019 Developer Network, LLC
+//
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE', which is part of this source code package.
+
 package atomizer
 
 import (
@@ -37,9 +42,8 @@ type atomizer struct {
 	eventsMu sync.RWMutex
 	events   chan interface{}
 
-	properties chan Properties
-	ctx        context.Context
-	cancel     context.CancelFunc
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	execSyncOnce sync.Once
 }
@@ -89,7 +93,6 @@ func (a *atomizer) event(events ...interface{}) {
 				select {
 				case <-a.ctx.Done():
 					return
-
 				case a.events <- e:
 				}
 			}
@@ -101,10 +104,16 @@ func (a *atomizer) event(events ...interface{}) {
 // while other parts of the atomizer reads in the inputs and executes the
 // instances of electrons
 func (a *atomizer) receive() {
-	defer a.event(rec())
+	if a.registrations == nil {
+		a.event(Error{
+			Event: Event{
+				Message: "nil registrations channel",
+			},
+		})
+		return
+	}
 
 	// TODO: Self-heal with heartbeats
-
 	for {
 		select {
 		case <-a.ctx.Done():
@@ -163,14 +172,6 @@ func (a *atomizer) receiveConductor(conductor Conductor) error {
 		}}
 	}
 
-	// Create the source context with a cancellation
-	// option and store the cancellation in a sync map
-	// ctx, ctxFunc := context.WithCancel(a.ctx)
-	// TODO: use the conductor wrapper:
-	// cwrapper{conductor, ctx, ctxFunc}
-	// so that the conductor can be cancelled if necessary
-	// Push off the reading into it's own go routine
-	// so that it's concurrent
 	go a.conduct(a.ctx, conductor)
 
 	return nil
@@ -179,11 +180,6 @@ func (a *atomizer) receiveConductor(conductor Conductor) error {
 // conduct reads in from a specific electron channel of a conductor and drop
 // it onto the atomizer channel for electrons
 func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
-	// defer a.event(handle(ctx, conductor, func() {
-
-	// TODO: HANDLE the sampler panic differently here so that
-	//it properly crashes the atomizer
-
 	// Self Heal - Re-place the conductor on the register channel for
 	// the atomizer to re-initialize so this stack can be
 	// garbage collected
@@ -192,10 +188,6 @@ func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
 	// }))
 
 	receiver := conductor.Receive(ctx)
-	a.event(Event{
-		Message:     "conductor initialized",
-		ConductorID: ID(conductor),
-	})
 
 	// Read from the electron channel for a conductor and push onto
 	// the a electron channel for processing
@@ -280,7 +272,7 @@ func (a *atomizer) receiveAtom(atom Atom) error {
 	a.atomsMu.Lock()
 	defer a.atomsMu.Unlock()
 
-	a.atoms[ID(atom)] = a.split(a.ctx, atom)
+	a.atoms[ID(atom)] = a.split(atom)
 	a.event(Event{
 		Message: "registered electron channel",
 		AtomID:  ID(atom),
@@ -289,40 +281,23 @@ func (a *atomizer) receiveAtom(atom Atom) error {
 	return nil
 }
 
-func (a *atomizer) split(ctx context.Context, atom Atom) chan<- instance {
+func (a *atomizer) split(atom Atom) chan<- instance {
 	electrons := make(chan instance)
 
-	go a._split(ctx, atom, electrons)
+	go a._split(atom, electrons)
 
 	return electrons
 }
 
 func (a *atomizer) _split(
-	ctx context.Context,
 	atom Atom,
 	electrons <-chan instance,
 ) {
-	defer a.event(handle(ctx, atom, func() {
-
-		// remove the electron channel from the map of atoms
-		// so that it can be properly cleaned up before
-		// re-registering
-		a.atomsMu.Lock()
-		defer a.atomsMu.Unlock()
-
-		delete(a.atoms, ID(atom))
-
-		// Self Heal - Re-place the atom on the register
-		// channel for the atomizer to re-initialize so
-		// this stack can be garbage collected
-		a.event(a.Register(atom))
-	}))
-
 	// Read from the electron channel for a conductor and push
 	// onto the a electron channel for processing
 	for {
 		select {
-		case <-ctx.Done():
+		case <-a.ctx.Done():
 			return
 		case inst, ok := <-electrons:
 			if !ok {
@@ -355,38 +330,20 @@ func (a *atomizer) _split(
 				reflect.TypeOf(atom).Elem(),
 			)
 
-			a.exec(ctx, inst, newAtom)
+			// ok is not checked here because this should
+			// never fail since the originating data item
+			// is what created this
+			atom, _ := newAtom.Interface().(Atom)
+
+			a.exec(inst, atom)
 		}
 	}
 }
 
 func (a *atomizer) exec(
-	ctx context.Context,
 	inst instance,
-	newAtom reflect.Value,
+	atom Atom,
 ) {
-	//defer func() {
-	//	fmt.Println("CANCELLED")
-	//	inst.Cancel()
-	//}()
-
-	// TODO: Handler here
-	// Type assert the new copy of the atom to an atom so that it can
-	// be used for processing and returned as a pointer for bonding
-	// the := is on purpose here to hide the original instance of the
-	// atom so that it's not being accidentally used in this section
-	atom, ok := newAtom.Interface().(Atom)
-	if !ok {
-		a.event(Error{
-			Event: Event{
-				Message:     "unable to assert atom",
-				AtomID:      ID(newAtom),
-				ElectronID:  inst.electron.ID,
-				ConductorID: ID(inst.conductor),
-			},
-		})
-		return
-	}
 
 	// bond the new atom instantiation to the electron instance
 	if err := inst.bond(atom); err != nil {
@@ -402,31 +359,33 @@ func (a *atomizer) exec(
 		return
 	}
 
-	// TODO: add this back in after the sampler is working
-	// Push the instance to the next part of the process
-	// select {
-	// case <-ctx.Done():
-	// 	return
-	// case a.bonded <- inst:
-
-	// Execute the instance after it's been picked up
-	// for monitoring
-	// 	inst.execute(ctx)
-	// }
-
-	a.event(Event{
-		Message:     "executing electron",
-		ElectronID:  inst.electron.ID,
-		AtomID:      ID(atom),
-		ConductorID: ID(inst.conductor),
-	})
-
 	// Execute the instance after it's been
 	// picked up for monitoring
-	err := inst.execute(ctx)
+	err := inst.execute(a.ctx)
 	if err != nil {
+		if inst.properties.Error != nil {
+			inst.properties.Error = simple(
+				"execution error",
+				simple(err.Error(),
+					simple(
+						"instance error",
+						inst.properties.Error,
+					),
+				),
+			)
+		} else {
+			inst.properties.Error = err
+		}
+
+		if inst.conductor != nil {
+
+			a.event(
+				inst.conductor.Complete(a.ctx, *inst.properties),
+			)
+		}
+
 		a.event(Error{
-			Internal: err,
+			Internal: inst.properties.Error,
 			Event: Event{
 				Message:    "error executing atom",
 				AtomID:     ID(atom),
@@ -437,10 +396,6 @@ func (a *atomizer) exec(
 }
 
 func (a *atomizer) distribute() {
-	// TODO: defer
-	defer close(a.electrons)
-
-	a.event("setting up atom distribution channels")
 
 	for {
 		select {
@@ -457,9 +412,6 @@ func (a *atomizer) distribute() {
 					},
 				})
 
-				// TODO: panic here because atomizer can't
-				// work without electron distribution
-				a.cancel()
 				return
 			}
 

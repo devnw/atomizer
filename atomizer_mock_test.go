@@ -26,6 +26,8 @@ var noopelectron = Electron{
 	AtomID:   "empty",
 }
 
+var noopinvalidelectron = Electron{}
+
 type invalidconductor struct{}
 
 type noopconductor struct{}
@@ -60,6 +62,30 @@ func (*noopatom) Process(
 	return nil, nil
 }
 
+type panicatom struct{}
+
+func (*panicatom) Process(
+	ctx context.Context,
+	conductor Conductor,
+	electron Electron,
+) ([]byte, error) {
+	panic("test panic")
+}
+
+type invalidatom struct{}
+
+func (*invalidatom) Process(
+	ctx context.Context,
+	conductor Conductor,
+	electron Electron,
+) ([]byte, error) {
+	return nil, nil
+}
+
+func (*invalidatom) Validate() bool {
+	return false
+}
+
 type validconductor struct {
 	echan chan Electron
 	valid bool
@@ -70,6 +96,7 @@ func (cond *validconductor) Receive(ctx context.Context) <-chan Electron {
 }
 
 func (cond *validconductor) Send(ctx context.Context, electron Electron) (response <-chan Properties, err error) {
+
 	return response, err
 }
 
@@ -130,29 +157,27 @@ func (pt *passthrough) Send(ctx context.Context, electron Electron) (<-chan Prop
 	var err error
 	result := make(chan Properties)
 
-	if validator.Valid(electron) {
-		go func(result chan Properties) {
+	go func(result chan Properties) {
 
-			// Only kick off the electron for processing if there isn't already an
-			// instance loaded in the system
-			if _, loaded := pt.results.LoadOrStore(electron.ID, result); !loaded {
+		// Only kick off the electron for processing if there isn't already an
+		// instance loaded in the system
+		if _, loaded := pt.results.LoadOrStore(electron.ID, result); !loaded {
 
-				// Push the electron onto the input channel
-				select {
-				case <-ctx.Done():
-					return
-				case pt.input <- electron:
-					// setup a monitoring thread for /basepath/electronid
-				}
-			} else {
-				defer close(result)
-				p := Properties{}
-				alog.Errorf(nil, "duplicate electron registration for EID [%s]", electron.ID)
-
-				result <- p
+			// Push the electron onto the input channel
+			select {
+			case <-ctx.Done():
+				return
+			case pt.input <- electron:
+				// setup a monitoring thread for /basepath/electronid
 			}
-		}(result)
-	}
+		} else {
+			defer close(result)
+			p := Properties{}
+			alog.Errorf(nil, "duplicate electron registration for EID [%s]", electron.ID)
+
+			result <- p
+		}
+	}(result)
 
 	return result, err
 }

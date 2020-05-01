@@ -1,7 +1,13 @@
+// Copyright © 2019 Developer Network, LLC
+//
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE', which is part of this source code package.
+
 package atomizer
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/devnw/validator"
 )
@@ -11,8 +17,6 @@ type Atomizer interface {
 	Exec() error
 	Register(value ...interface{}) error
 	Events(buffer int) <-chan interface{}
-	Properties(buffer int) (<-chan Properties, error)
-	Wait()
 
 	// private methods enforce only this
 	// package can return an atomizer
@@ -56,46 +60,46 @@ func (a *atomizer) Exec() (err error) {
 // Register allows you to add additional type registrations to the atomizer
 // (ie. Conductors and Atoms)
 func (a *atomizer) Register(values ...interface{}) (err error) {
-	defer func() { err = rec() }()
+	defer func() {
+		if r := recover(); r != nil {
+			err = Error{
+				Event: Event{
+					Message: "panic in atomizer",
+				},
+				Internal: ptoe(r),
+			}
+		}
+	}()
 
-	for _, v := range values {
-		if !validator.Valid(v) {
+	for _, value := range values {
+		if !validator.Valid(value) {
 			// TODO: create event here indicating that
 			// a value was invalid and not registered
 			continue
 		}
 
-		// Pass the value on the registrations
-		// channel to be received
-		select {
-		case <-a.ctx.Done():
-			return
-		case a.registrations <- v:
+		switch v := value.(type) {
+		case Conductor, Atom:
+			// Pass the value on the registrations
+			// channel to be received
+			select {
+			case <-a.ctx.Done():
+				return simple("context closed", nil)
+			case a.registrations <- v:
+			}
+		default:
+			return simple(
+				fmt.Sprintf(
+					"invalid value in registration %s",
+					ID(value),
+				),
+				nil,
+			)
 		}
 
 	}
 
 	return err
-}
-
-// Properties initializes the properties channel if it isn't already
-// allocated and then returns the properties channel of the atomizer
-// so that the requestor can start getting properties as processing
-// finishes on their atoms
-// XXX(benji): Figure out what the original purpose of this was
-func (a *atomizer) Properties(buffer int) (<-chan Properties, error) {
-	var err error
-
-	if buffer < 0 {
-		buffer = 0
-	}
-
-	if a.properties == nil {
-
-		a.properties = make(chan Properties, buffer)
-	}
-
-	return a.properties, err
 }
 
 // Events creates a channel to receive events from the atomizer and
@@ -114,18 +118,4 @@ func (a *atomizer) Events(buffer int) <-chan interface{} {
 	}
 
 	return a.events
-}
-
-// Wait blocks on the context done channel to allow for the executable
-// to block for the atomizer to finish processing
-func (a *atomizer) Wait() {
-	<-a.ctx.Done()
-
-	// XXX(benji) ensure that is is correct and wont panic
-	// this should also clean up the atom specific channels
-	close(a.electrons)
-	close(a.bonded)
-	close(a.properties)
-	close(a.events)
-	close(a.registrations)
 }

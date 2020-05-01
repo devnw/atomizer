@@ -3,6 +3,7 @@ package atomizer
 import (
 	"testing"
 
+	"github.com/devnw/validator"
 	"github.com/pkg/errors"
 )
 
@@ -92,6 +93,25 @@ func TestError_Unwrap(t *testing.T) {
 	e := errors.New("wrapped error")
 
 	aerr := Error{
+		Internal: Error{
+			Internal: e,
+		},
+	}
+
+	if aerr.Unwrap() != e {
+		t.Errorf(
+			"expected [%v] got [%v]",
+			e,
+			aerr.Unwrap(),
+		)
+	}
+}
+
+func TestError_Unwrap_Fail(t *testing.T) {
+
+	e := errors.New("wrapped error")
+
+	aerr := Error{
 		Internal: e,
 	}
 
@@ -101,5 +121,44 @@ func TestError_Unwrap(t *testing.T) {
 			e,
 			aerr.Unwrap(),
 		)
+	}
+}
+
+func TestError_Validate(t *testing.T) {
+
+	tests := []struct {
+		name  string
+		e     error
+		valid bool
+	}{
+		{
+			"error w/valid event",
+			Error{
+				Event: Event{
+					Message: "test",
+				},
+			},
+			true,
+		},
+		{
+			"error w/invalid event",
+			Error{
+				Event: Event{},
+			},
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			v := validator.Valid(test.e)
+			if test.valid != v {
+				t.Errorf(
+					"expected [%v] got [%v]",
+					test.valid,
+					v,
+				)
+			}
+		})
 	}
 }

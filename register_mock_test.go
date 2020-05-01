@@ -1,10 +1,38 @@
 package atomizer
 
-import "sync"
+import (
+	"context"
+	"sync"
+	"testing"
+	"time"
 
-// reset clears out the pre-registered values and channels uses for
-// registration this method is primarily for testing and should not be
-// used otherwise
-func reset() {
+	"github.com/devnw/alog"
+)
+
+func reset(ctx context.Context, t *testing.T) {
 	registrant = sync.Map{}
+
+	if ctx != nil {
+		_ = alog.Global(
+			ctx,                              // Default context
+			"",                               // No prefix
+			alog.DEFAULTTIMEFORMAT,           // Standard time format
+			time.UTC,                         // UTC logging
+			alog.DEFAULTBUFFER,               // Default buffer of 100 logs
+			alog.TestDestinations(ctx, t)..., // Default destinations
+		)
+	}
+}
+
+func resetB() {
+	registrant = sync.Map{}
+
+	_ = alog.Global(
+		context.Background(),        // Default context
+		"",                          // No prefix
+		alog.DEFAULTTIMEFORMAT,      // Standard time format
+		time.UTC,                    // UTC logging
+		alog.DEFAULTBUFFER,          // Default buffer of 100 logs
+		alog.BenchDestinations()..., // Default destinations
+	)
 }

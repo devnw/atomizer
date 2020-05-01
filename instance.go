@@ -1,10 +1,14 @@
+// Copyright © 2019 Developer Network, LLC
+//
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE', which is part of this source code package.
+
 package atomizer
 
 import (
 	"context"
 	"time"
 
-	"github.com/devnw/alog"
 	"github.com/devnw/validator"
 )
 
@@ -49,40 +53,6 @@ func (i *instance) bond(atom Atom) (err error) {
 	return nil
 }
 
-// setupCtx branches a new context off for use in
-// the instance rather than using the parent context
-// which allows for a cancel to be established for each
-// instance of a bonded atom/electron pair
-func (i *instance) setupCtx(ctx context.Context) (context.Context, error) {
-
-	if err := validator.Assert(i.electron, ctx); err != nil {
-		return nil, Error{
-			Event: Event{
-				Message: "invalid electron in instance",
-				AtomID:  ID(i.atom),
-			},
-			Internal: err,
-		}
-	}
-
-	// Initialize the new context object for the
-	// processing of the electron/atom
-	if i.electron.Timeout != nil {
-
-		// Create a new context for the electron with a timeout
-		i.ctx, i.cancel = _ctxT(
-			ctx,
-			*i.electron.Timeout,
-		)
-	} else {
-		// Create a new context for the electron
-		// with a cancellation option
-		i.ctx, i.cancel = context.WithCancel(ctx)
-	}
-
-	return i.ctx, nil
-}
-
 // complete marks the completion of execution and pushes
 // the results to the conductor
 func (i *instance) complete() error {
@@ -90,20 +60,40 @@ func (i *instance) complete() error {
 	// Set the end time and status in the properties
 	i.properties.End = time.Now()
 
+	if !validator.Valid(i.conductor) {
+		return Error{
+			Event: Event{
+				Message:    "conductor validation failed",
+				AtomID:     ID(i.atom),
+				ElectronID: i.electron.ID,
+			},
+		}
+	}
+
 	// Push the completed instance properties to the conductor
 	return i.conductor.Complete(i.ctx, *i.properties)
 }
 
 // execute runs the process method on the bonded atom / electron pair
-func (i *instance) execute(ctx context.Context) error {
-
+func (i *instance) execute(ctx context.Context) (err error) {
 	defer func() {
-		if err := recInst(
-			ID(i.atom),
-			i.electron.ID,
-		); err != nil {
-			i.properties.Error = err
+		if r := recover(); r != nil {
+			err = Error{
+				Event: Event{
+					Message:    "panic in atomizer",
+					AtomID:     ID(i.atom),
+					ElectronID: i.electron.ID,
+				},
+				Internal: ptoe(r),
+			}
+
+			return
 		}
+
+		// ensure that when this method exits the completion
+		// of this instance takes place and is pushed to the
+		// conductor
+		err = i.complete()
 	}()
 
 	// ensure the instance is valid before attempting
@@ -120,15 +110,7 @@ func (i *instance) execute(ctx context.Context) error {
 	}
 
 	// Establish internal context
-	ctx, err := i.setupCtx(ctx)
-	if err != nil {
-		return Error{
-			Event: Event{
-				Message: "error setting instance ctx",
-			},
-			Internal: err,
-		}
-	}
+	i.ctx, i.cancel = _ctxT(ctx, i.electron.Timeout)
 
 	i.properties = &Properties{
 		ElectronID: i.electron.ID,
@@ -136,27 +118,12 @@ func (i *instance) execute(ctx context.Context) error {
 		Start:      time.Now(),
 	}
 
-	// ensure that when this method exits the completion
-	// of this instance takes place and is pushed to the
-	// conductor
-	defer func() {
-		err = i.complete()
-		if err != nil {
-			// TODO: fix this, the errors are not propagating up
-			alog.Error(err)
-		}
-	}()
-
-	alog.Printf("executing electron [%s]\n", i.electron.ID)
-
 	// TODO: Setup with a heartbeat for monitoring processing of the
 	// bonded atom stream in from the process method
 
 	// Execute the process method of the atom
 	i.properties.Result, i.properties.Error = i.atom.Process(
-		ctx, i.conductor, i.electron)
-
-	alog.Printf("electron [%s] processed\n", i.electron.ID)
+		i.ctx, i.conductor, i.electron)
 
 	// TODO: The processing has finished for this bonded atom and the
 	// results need to be calculated and the properties sent back to the

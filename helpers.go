@@ -1,3 +1,8 @@
+// Copyright © 2019 Developer Network, LLC
+//
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE', which is part of this source code package.
+
 package atomizer
 
 import (
@@ -21,39 +26,17 @@ func _ctx(c context.Context) (context.Context, context.CancelFunc) {
 // _ctxT returns a context with a timeout that is passed in as a time.Duration
 func _ctxT(
 	c context.Context,
-	duration time.Duration,
+	duration *time.Duration,
 ) (context.Context, context.CancelFunc) {
 	if c == nil {
 		c = context.Background()
 	}
 
-	return context.WithTimeout(c, duration)
-}
-
-// recInst recovers an instance inside of atomizer
-// accepting the atom and electron id where applicable
-// so that a more complete error is pushed to an event
-func recInst(aID, eID string) error {
-
-	if r := recover(); r != nil {
-
-		return Error{
-			Event: Event{
-				Message:    "panic in atomizer",
-				AtomID:     aID,
-				ElectronID: eID,
-			},
-			Internal: ptoe(r),
-		}
-
+	if duration == nil {
+		return _ctx(c)
 	}
 
-	return nil
-}
-
-// rec recovers from a panic, creating an atomizer error
-func rec() error {
-	return recInst("", "")
+	return context.WithTimeout(c, *duration)
 }
 
 // ID returns the registration id for the passed in object type

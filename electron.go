@@ -1,3 +1,8 @@
+// Copyright © 2019 Developer Network, LLC
+//
+// This file is subject to the terms and conditions defined in
+// file 'LICENSE', which is part of this source code package.
+
 package atomizer
 
 import (
@@ -70,7 +75,7 @@ func (e *Electron) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON implements the custom json marshaler for electron
-func (e *Electron) MarshalJSON() ([]byte, error) {
+func (e Electron) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		SenderID string          `json:"senderid"`
 		ID       string          `json:"id"`
