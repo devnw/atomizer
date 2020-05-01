@@ -61,9 +61,12 @@ func (e *Electron) UnmarshalJSON(data []byte) error {
 	if jsonE.Payload != nil {
 		pay := strings.Trim(string(jsonE.Payload), "\"")
 		e.Payload, err = base64.StdEncoding.DecodeString(pay)
+		if err != nil {
+			e.Payload = jsonE.Payload
+		}
 	}
 
-	return err
+	return nil
 }
 
 // MarshalJSON implements the custom json marshaler for electron
