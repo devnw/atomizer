@@ -7,6 +7,8 @@ import (
 type invalidTestStruct struct{}
 
 func TestRegister(t *testing.T) {
+	ctx, cancel := _ctx(nil)
+	defer cancel()
 
 	tests := []struct {
 		name  string
@@ -42,8 +44,8 @@ func TestRegister(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			reset()
-			defer reset()
+			reset(ctx, t)
+			defer reset(nil, t)
 
 			err := Register(test.value)
 			if err != nil && !test.err {

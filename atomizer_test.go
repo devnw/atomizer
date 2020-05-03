@@ -31,16 +31,15 @@ func printEvents(
 	}
 }
 
-// TODO: Add result nil checks on conductor response
 func TestAtomizer_Exec(t *testing.T) {
+	d := time.Second * 30
+	// Setup a cancellation context for the test
+	ctx, cancel := _ctxT(nil, &d)
+	defer cancel()
 
 	// Execute clean at beginning and end
-	reset()
-	defer reset()
-
-	// Setup a cancellation context for the test
-	ctx, cancel := _ctxT(nil, time.Second*30)
-	defer cancel()
+	reset(ctx, t)
+	defer reset(nil, t)
 
 	events := make(chan interface{}, 1000)
 
@@ -118,83 +117,94 @@ func TestAtomizer_Exec(t *testing.T) {
 }
 
 func TestAtomizer_Exec_Returner(t *testing.T) {
-
-	reset()
-	defer reset()
-
 	ctx, cancel := _ctx(nil)
 	defer cancel()
 
+	reset(ctx, t)
+	defer reset(nil, t)
+
 	t.Log("Initializing Test Harness")
 
-	if conductor, err := harness(ctx, nil); err == nil {
-
-		t.Log("Harness Successfully Created")
-
-		var sent = time.Now()
-
-		wg := sync.WaitGroup{}
-
-		// Spawn electrons
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			tests := spawnReturner(50)
-
-			t.Logf("[%v] tests loaded", len(tests))
-
-			results := make(chan Properties)
-
-			go func() {
-
-				for _, test := range tests {
-
-					wg.Add(1)
-					go func(test *tresult) {
-						defer wg.Done()
-
-						var err error
-
-						var result <-chan Properties
-						// Send the electron onto the conductor
-						if result, err = conductor.Send(ctx, test.electron); err == nil {
-
-							select {
-							case <-ctx.Done():
-								return
-							case result, ok := <-result:
-								if ok {
-									if result.Error == nil {
-
-										if validator.Valid(result.Result) {
-											res := string(result.Result)
-											if res != test.result {
-												t.Errorf("%s != %s", test.result, res)
-											}
-										} else {
-											t.Error("results length is not 1")
-										}
-									} else {
-										t.Error("Error returned from atom", result.Error)
-									}
-								} else {
-									t.Error("result channel closed, test failed")
-								}
-							}
-						}
-					}(test)
-				}
-
-				wg.Wait()
-				close(results)
-			}()
-		}()
-
-		t.Logf("Processing Time Through Atomizer %s\n", time.Since(sent).String())
-
-	} else {
+	conductor, err := harness(ctx, nil)
+	if err != nil {
 		t.Errorf("error while executing harness | %s", err)
+	}
+
+	t.Log("Harness Successfully Created")
+
+	var sent = time.Now()
+	wg := sync.WaitGroup{}
+
+	tests := spawnReturner(50)
+
+	t.Logf("[%v] tests loaded", len(tests))
+
+	results := make(chan Properties)
+
+	go func() {
+		defer cancel()
+
+		for _, test := range tests {
+
+			wg.Add(1)
+			go func(test *tresult) {
+				defer wg.Done()
+
+				sentAndEval(
+					ctx,
+					t,
+					conductor,
+					test,
+				)
+			}(test)
+		}
+
+		wg.Wait()
+		close(results)
+	}()
+
+	<-ctx.Done()
+	t.Logf(
+		"Processing Time Through Atomizer %s\n",
+		time.Since(sent).String(),
+	)
+}
+
+func sentAndEval(
+	ctx context.Context,
+	t *testing.T,
+	c Conductor,
+	test *tresult,
+) {
+	// Send the electron onto the conductor
+	result, err := c.Send(ctx, test.electron)
+	if err != nil {
+		t.Errorf("Error sending electron %s", test.electron.ID)
+	}
+
+	select {
+	case <-ctx.Done():
+		return
+	case result, ok := <-result:
+		if !ok {
+			t.Error("result channel closed, test failed")
+		}
+
+		if result.Error != nil {
+			t.Error(
+				"Error returned from atom",
+				result.Error,
+			)
+		}
+
+		if !validator.Valid(result.Result) {
+			t.Error("results length is not 1")
+		}
+
+		res := string(result.Result)
+		if res != test.result {
+			t.Errorf("%s != %s", test.result, res)
+		}
 	}
 }
 
@@ -236,34 +246,37 @@ func TestAtomizeNoConductors(t *testing.T) {
 	defer cancel()
 
 	for _, test := range tests {
-		// Reset sync map for this test
-		reset()
+		t.Run(test.key, func(t *testing.T) {
+			reset(ctx, t)
+			defer reset(nil, t)
 
-		// Store the test conductor
-		if test.err || (!test.err && test.value != nil) {
-			// TODO: should the error be ignored here?
-			// Store invalid conductor
-			_ = Register(test.value)
-		}
+			// Store the test conductor
+			if test.err || (!test.err && test.value != nil) {
+				// TODO: should the error be ignored here?
+				// Store invalid conductor
+				_ = Register(test.value)
+			}
 
-		a := Atomize(ctx, nil)
-		if err := a.Exec(); err != nil {
-			t.Error(err)
-		}
+			a := Atomize(ctx, nil)
+			if err := a.Exec(); err != nil {
+				t.Error(err)
+			}
 
-		if !validator.Valid(a) {
-			t.Errorf("atomizer was expected to be valid but was returned invalid")
-		}
+			if !validator.Valid(a) {
+				t.Errorf("atomizer was expected to be valid but was returned invalid")
+			}
 
-		// Cleanup sync map for additional tests
-		reset()
+		})
 	}
 }
 
 func TestAtomizer_AddConductor(t *testing.T) {
+	ctx, cancel := _ctx(nil)
+	defer cancel()
+
 	tests := []struct {
 		key   string
-		value Conductor
+		value interface{}
 		err   bool
 	}{
 		{
@@ -286,78 +299,462 @@ func TestAtomizer_AddConductor(t *testing.T) {
 			&validconductor{},
 			true,
 		},
-		{ // Empty key test
-			"",
+	}
+
+	for _, test := range tests {
+
+		t.Run(test.key, func(t *testing.T) {
+			// Reset sync map for this test
+			reset(ctx, t)
+			defer reset(nil, t)
+
+			a := Atomize(ctx, nil)
+
+			err := a.Exec()
+			if err != nil {
+				t.Error(err)
+			}
+
+			// Add the conductor
+			err = a.Register(test.value)
+			if err != nil && !test.err {
+				t.Errorf("expected success, received error")
+			}
+		})
+	}
+}
+
+func TestAtomizer_register_Errs(t *testing.T) {
+	ctx, cancel := _ctx(nil)
+	defer cancel()
+
+	tests := []struct {
+		key   string
+		a     *atomizer
+		value interface{}
+	}{
+		{
+			"invalid conductor test",
+			&atomizer{ctx: ctx},
 			&validconductor{},
-			true,
+		},
+		{
+			"Invalid Struct Type",
+			&atomizer{ctx: ctx},
+			&struct{}{},
 		},
 	}
 
 	for _, test := range tests {
-		// Reset sync map for this test
-		reset()
 
-		func() {
-			var ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
-			defer cancel()
+		t.Run(test.key, func(t *testing.T) {
+			events := test.a.Events(1)
 
-			var err error
+			test.a.register(test.value)
 
-			// Create an instance of the atomizer to test the add conductor with
-			events := make(chan interface{})
-			a := Atomize(ctx, events)
-
-			if err := a.Exec(); err != nil {
-				t.Error(err)
+			out, ok := <-events
+			if !ok {
+				t.Error("channel closed")
+				return
 			}
 
-			if validator.Valid(a) {
+			t.Log(out)
 
-				// Add the conductor
-				if err = Register(test.value); err == nil {
-
-					select {
-					case <-ctx.Done():
-						// context for the atomizer was cancelled
-					case event, ok := <-events:
-						if ok {
-							if _, ok := event.(Error); ok {
-								if ok && test.err {
-									t.Errorf("expected error for test [%s] but received success", test.key)
-								} else if ok && !test.err {
-									t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
-								}
-							}
-						} else {
-							// TODO:
-						}
-					}
-				} else if !test.err {
-					t.Errorf("expected success for test [%s] but received error [%s]", test.key, err)
-				}
-			} else {
-				t.Errorf("expected the atomizer to be valid but it was invalid for ALL tests")
-			}
-		}()
-
-		// Cleanup sync map for additional tests
-		reset()
+		})
 	}
 }
 
-// Tests the proper functionality of errors passing over the atomizer channel
-func TestAtomizer_Errors(t *testing.T) {
+func TestAtomizer_Register_Errs(t *testing.T) {
+	ctx, cancel := _ctx(nil)
+	cancel()
 
+	tests := []struct {
+		key   string
+		a     *atomizer
+		value interface{}
+	}{
+		{
+			"panic test, nil channels",
+			&atomizer{},
+			&validconductor{make(chan Electron), true},
+		},
+		{
+			"close context test",
+			&atomizer{ctx: ctx},
+			&validconductor{make(chan Electron), true},
+		},
+		{
+			"Invalid Struct Type",
+			&atomizer{},
+			&struct{}{},
+		},
+	}
+
+	for _, test := range tests {
+
+		t.Run(test.key, func(t *testing.T) {
+
+			// Add the conductor
+			err := test.a.Register(test.value)
+			if err == nil {
+				t.Errorf("expected error, received success")
+			}
+		})
+	}
 }
 
-// Tests that the exit method properly cleans up the atomizer
-func TestAtomizer_Exit(t *testing.T) {
+// Tests the proper functionality of event passing over the atomizer channel
+func TestAtomizer_Events(t *testing.T) {
+	a := &atomizer{ctx: context.Background()}
 
+	events := a.Events(1)
+	in := Event{Message: "hello kitty"}
+
+	a.event(in)
+
+	out, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	if in != out {
+		t.Error("events do not match")
+		return
+	}
 }
 
-// Tests that the log channel out of the atomizer works properly
-func TestAtomizer_Logs(t *testing.T) {
+// Tests the proper functionality of event passing over the atomizer channel
+func TestAtomizer_Events_NegBuff(t *testing.T) {
+	a := &atomizer{ctx: context.Background()}
 
+	events := a.Events(-1)
+	in := Event{Message: "hello kitty"}
+
+	go a.event(in)
+
+	out, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	if in != out {
+		t.Error("events do not match")
+		return
+	}
+}
+
+func TestAtomizer_event(t *testing.T) {
+	ctx, cancel := _ctx(nil)
+	cancel()
+
+	a := &atomizer{ctx: ctx}
+
+	a.Events(0)
+	in := Event{Message: "hello kitty"}
+
+	a.event(in)
+}
+
+func TestAtomizer_event_panic(t *testing.T) {
+	a := &atomizer{}
+
+	events := a.Events(1)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expected panic")
+		}
+	}()
+
+	a.event(Event{Message: "hello kitty"})
+
+	_, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	t.Error("shouldn't have been able to get here")
+}
+
+func TestAtomizer_receive_panic(t *testing.T) {
+	a := &atomizer{}
+
+	events := a.Events(1)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expected panic")
+		}
+	}()
+
+	a.receive()
+
+	_, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	t.Error("shouldn't have been able to get here")
+}
+
+func TestAtomizer_receive_nilreg(t *testing.T) {
+	a := &atomizer{ctx: context.Background()}
+
+	events := a.Events(1)
+
+	a.receive()
+
+	out, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	_, ok = out.(error)
+	if !ok {
+		t.Error("expected error")
+	}
+}
+
+func TestAtomizer_receive_closedReg(t *testing.T) {
+	a := &atomizer{
+		ctx:           context.Background(),
+		registrations: make(chan interface{}),
+	}
+
+	close(a.registrations)
+
+	events := a.Events(1)
+
+	a.receive()
+
+	out, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	_, ok = out.(error)
+	if !ok {
+		t.Error("expected error")
+	}
+}
+
+func TestAtomizer_receiveAtom_invalid(t *testing.T) {
+	a := &atomizer{}
+
+	err := a.receiveAtom(&invalidatom{})
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestAtomizer_conduct_closedreceiver(t *testing.T) {
+	c := &validconductor{echan: make(chan Electron)}
+	close(c.echan)
+
+	a := &atomizer{ctx: context.Background()}
+
+	events := a.Events(1)
+
+	a.conduct(context.Background(), c)
+
+	out, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	_, ok = out.(error)
+	if !ok {
+		t.Error("expected error")
+	}
+}
+
+func TestAtomizer_conduct_panic(t *testing.T) {
+	c := &validconductor{echan: make(chan Electron)}
+	close(c.echan)
+
+	a := &atomizer{}
+
+	events := a.Events(2)
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expected panic")
+		}
+	}()
+
+	a.conduct(context.Background(), c)
+
+	_, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	t.Error("expected panic")
+}
+
+func TestAtomizer_conduct_invalidE(t *testing.T) {
+	c := &passthrough{input: make(chan Electron)}
+	a := &atomizer{ctx: context.Background()}
+	go a.conduct(context.Background(), c)
+
+	t.Log("sending")
+	results, err := c.Send(context.Background(), noopinvalidelectron)
+	if err != nil {
+		t.Error(err)
+	}
+
+	t.Log("waiting on results")
+	res, ok := <-results
+	if !ok {
+		t.Error("unexpected closed channel")
+	}
+
+	if res.Error == nil {
+		t.Error("expected error result")
+	}
+}
+
+func TestAtomizer_split_closedEchan(t *testing.T) {
+	a := &atomizer{
+		ctx: context.Background(),
+	}
+
+	events := a.Events(1)
+	echan := make(chan instance)
+	close(echan)
+
+	a._split(nil, echan)
+
+	out, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	_, ok = out.(error)
+	if !ok {
+		t.Error("expected error")
+	}
+}
+
+func TestAtomizer_distribute_closedEchan(t *testing.T) {
+	ctx, cancel := _ctx(nil)
+	a := &atomizer{
+		ctx:       ctx,
+		cancel:    cancel,
+		electrons: make(chan instance),
+	}
+	close(a.electrons)
+
+	events := a.Events(1)
+
+	a.distribute()
+
+	out, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	_, ok = out.(error)
+	if !ok {
+		t.Error("expected error")
+	}
+}
+
+func TestAtomizer_exec_ERR(t *testing.T) {
+	ctx, cancel := _ctx(nil)
+	a := &atomizer{
+		ctx:    ctx,
+		cancel: cancel,
+	}
+
+	events := a.Events(1)
+	i := instance{ctx: ctx, cancel: cancel}
+
+	a.exec(i, nil)
+
+	out, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	_, ok = out.(error)
+	if !ok {
+		t.Error("expected error")
+	}
+}
+
+func TestAtomizer_distribute_unregistered(t *testing.T) {
+	ctx, cancel := _ctx(nil)
+	a := &atomizer{
+		ctx:       ctx,
+		cancel:    cancel,
+		electrons: make(chan instance),
+	}
+
+	events := a.Events(1)
+	i := instance{
+		ctx:      ctx,
+		cancel:   cancel,
+		electron: Electron{AtomID: "nopey.nope"},
+	}
+
+	go a.distribute()
+	go func() { a.electrons <- i }()
+
+	out, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	_, ok = out.(error)
+	if !ok {
+		t.Error("expected error")
+	}
+}
+
+func TestAtomizer_exec_inst_err(t *testing.T) {
+	ctx, cancel := _ctx(nil)
+	a := &atomizer{
+		ctx:       ctx,
+		cancel:    cancel,
+		electrons: make(chan instance),
+	}
+
+	events := a.Events(1)
+	i := instance{
+		ctx:       ctx,
+		cancel:    cancel,
+		electron:  noopelectron,
+		conductor: &noopconductor{},
+	}
+
+	go a.exec(i, &panicatom{})
+
+	out, ok := <-events
+	if !ok {
+		t.Error("channel closed")
+		return
+	}
+
+	_, ok = out.(error)
+	if !ok {
+		t.Error("expected error")
+	}
 }
 
 // Validates the instance of the atomizer
@@ -387,115 +784,59 @@ func TestAtomizer_Validate(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		t.Run(test.key, func(t *testing.T) {
+			ok := validator.Valid(test.value)
+			if !ok && !test.err {
+				t.Errorf("expected success, got error")
+			}
 
-		if ok := validator.Valid(test.value); !test.err && !ok {
-			t.Errorf("expected success for test [%s] but received failure", test.key)
-		} else if test.err && ok {
-			t.Errorf("expected error for test [%s] but received success", test.key)
-		}
+			if ok && test.err {
+				t.Errorf("expected error")
+			}
+		})
 	}
 }
 
-/********************************
-*
-*	BENCHMARKS
-*
-********************************/
+//********************************
+// BENCHMARKS
+//********************************
 
 func BenchmarkAtomizer_Exec_Single(b *testing.B) {
 
-	reset()
-	defer reset()
+	resetB()
+	defer resetB()
 
 	ctx, cancel := _ctx(nil)
 	defer cancel()
 
-	if conductor, err := harness(ctx, nil); err == nil {
-
-		// cleanup the benchmark timer to get correct measurements
-		b.ResetTimer()
-
-		for n := 0; n < b.N; n++ {
-			e := newElectron("atomizer.noopatom", nil)
-
-			var result <-chan Properties
-			// Send the electron onto the conductor
-			if result, err = conductor.Send(ctx, e); err == nil {
-
-				select {
-				case <-ctx.Done():
-					b.Error("context closed, test failed")
-					return
-				case result, ok := <-result:
-					if ok {
-						fmt.Printf("Step [%v]\n", n)
-						if result.Error != nil {
-							b.Error("Error returned from atom", result.Error)
-						}
-					} else {
-						b.Error("result channel closed, test failed")
-					}
-				}
-
-				// // Send the electron onto the conductor
-				// resp := conductor.Send(ctx, e)
-
-				// select {
-				// case <-ctx.Done():
-				// 	b.Error("context closed, test failed")
-				// 	return
-				// case result, ok := <-resp:
-				// 	if ok {
-				// 		if result != nil && result.Error() == nil {
-				// 			// DO NOTHING
-				// 		} else {
-				// 			b.Error("invalid benchmark")
-				// 		}
-				// 	} else {
-				// 		b.Error("result channel closed, test failed")
-				// 	}
-				// }
-			}
-		}
-	} else {
+	conductor, err := harness(ctx, nil)
+	if err != nil {
 		b.Errorf("test harness failed [%s]", err.Error())
 	}
-}
 
-// Benchmarks the creation of an atomizer instance
-func BenchmarkAtomize(b *testing.B) {
-
-}
-
-// Benchmarks the cleanup of the atomizer given 1 electron
-func BenchmarkAtomizer_Exit1(b *testing.B) {
-
-}
-
-// Benchmarks the cleanup of the atomizer given 10 electrons
-func BenchmarkAtomizer_Exit10(b *testing.B) {
-
-}
-
-// Benchmarks the cleanup of the atomizer given 100 electrons
-func BenchmarkAtomizer_Exit100(b *testing.B) {
-
-}
-
-// Benchmarks the validation method of the atomizer
-func BenchmarkAtomizer_Validate(b *testing.B) {
-	var a = &atomizer{
-		electrons: make(chan instance),
-		bonded:    make(chan instance),
-		ctx:       context.Background(),
-		cancel: context.CancelFunc(func() {
-
-		}),
-	}
+	// cleanup the benchmark timer to get correct measurements
+	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		if !validator.Valid(a) {
-			b.Error("invalid atomizer, expected valid")
+		e := newElectron(ID(noopatom{}), nil)
+
+		// Send the electron onto the conductor
+		result, err := conductor.Send(ctx, e)
+		if err != nil {
+			b.Error(err)
+		}
+
+		select {
+		case <-ctx.Done():
+			b.Error("context closed, test failed")
+		case result, ok := <-result:
+			if !ok {
+				b.Error("result channel closed, test failed")
+			}
+
+			if result.Error != nil {
+				b.Error("Error returned from atom", result.Error)
+			}
 		}
 	}
 }

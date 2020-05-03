@@ -19,6 +19,11 @@ func TestEvent_String(t *testing.T) {
 			"test",
 		},
 		{
+			"makeEvent message test",
+			makeEvent("test"),
+			"test",
+		},
+		{
 			"message w/a test",
 			Event{
 				Message: "test",
