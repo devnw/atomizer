@@ -20,13 +20,16 @@ func init() {
 // Electron is the base electron that MUST parse from the payload
 // from the conductor
 type Electron struct {
-	// SenderID is the identifier for the node that sent the electron
+	// SenderID is the unique identifier for the node that sent the
+	// electron
 	SenderID string
 
-	// ID is the identifier of this electron
+	// ID is the unique identifier of this electron
 	ID string
 
 	// AtomID is the identifier of the atom for this electron instance
+	// this is generally `package.Type`. Use the atomizer.ID() method
+	// if unsure of the type for an Atom.
 	AtomID string
 
 	// Timeout is the maximum time duration that should be allowed
