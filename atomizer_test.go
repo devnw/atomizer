@@ -648,6 +648,17 @@ func TestAtomizer_split_closedEchan(t *testing.T) {
 	}
 }
 
+func TestAtomizer_Wait(t *testing.T) {
+	ctx, cancel := _ctx(nil)
+	a := &atomizer{
+		ctx:    ctx,
+		cancel: cancel,
+	}
+
+	cancel()
+	a.Wait()
+}
+
 func TestAtomizer_distribute_closedEchan(t *testing.T) {
 	ctx, cancel := _ctx(nil)
 	a := &atomizer{

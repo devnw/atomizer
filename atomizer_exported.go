@@ -17,6 +17,7 @@ type Atomizer interface {
 	Exec() error
 	Register(value ...interface{}) error
 	Events(buffer int) <-chan interface{}
+	Wait()
 
 	// private methods enforce only this
 	// package can return an atomizer
@@ -118,4 +119,10 @@ func (a *atomizer) Events(buffer int) <-chan interface{} {
 	}
 
 	return a.events
+}
+
+// Wait blocks on the context done channel to allow for the executable
+// to block for the atomizer to finish processing
+func (a *atomizer) Wait() {
+	<-a.ctx.Done()
 }
