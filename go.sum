@@ -2,8 +2,8 @@ github.com/Pallinder/go-randomdata v1.2.0 h1:DZ41wBchNRb/0GfsePLiSwb0PHZmT67XY00
 github.com/Pallinder/go-randomdata v1.2.0/go.mod h1:yHmJgulpD2Nfrm0cR9tI/+oAgRqCQQixsA8HyRZfV9Y=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/devnw/alog v1.0.2-0.20200502220347-f1c5d181b272 h1:q1DvaiSF1e71bVaV2SP4zQqEKmkqgtPdpxwAHDwQutg=
-github.com/devnw/alog v1.0.2-0.20200502220347-f1c5d181b272/go.mod h1:Aw4xF3fFZcv69DP3Ohu3OOMIJAtXZuY+tsXZusFrav8=
+github.com/devnw/alog v1.0.2 h1:xsp10SXX5pf7RIdRPDwq5QLfxaT9h9h43045N1fnu8Y=
+github.com/devnw/alog v1.0.2/go.mod h1:Aw4xF3fFZcv69DP3Ohu3OOMIJAtXZuY+tsXZusFrav8=
 github.com/devnw/validator v1.0.2 h1:AHOWd/lAfYafLdMJIkQwehiZSzhbYgyl4DrYbGrlKXI=
 github.com/devnw/validator v1.0.2/go.mod h1:YkDaw+j5A2uy3DMqhyecRqUhlDofVuCvsLTaiXh+Dn8=
 github.com/google/go-cmp v0.4.0 h1:xsAVV57WRhGj6kEIi8ReJzQlHHqcBYCElAvkovg3B/4=
