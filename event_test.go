@@ -73,7 +73,7 @@ func TestEvent_String(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			result := test.e.String()
 			if result != test.expected {
-				t.Errorf(
+				t.Fatalf(
 					"expected [%s] got [%s]",
 					test.expected,
 					result,

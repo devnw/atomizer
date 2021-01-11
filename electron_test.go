@@ -47,15 +47,15 @@ func TestElectron_MarshalJSON(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			res, err := json.Marshal(test.e)
 			if err != nil && !test.err {
-				t.Errorf("expected success, got error | %s", err.Error())
+				t.Fatalf("expected success, got error | %s", err.Error())
 			}
 
 			if err == nil && test.err {
-				t.Error("expected error")
+				t.Fatal("expected error")
 			}
 
 			if strings.Compare(string(res), test.expected) != 0 {
-				t.Errorf(
+				t.Fatalf(
 					"mismatch: e[%s] != r[%s]",
 					test.expected,
 					string(res),
@@ -105,15 +105,15 @@ func TestElectron_UnmarshalJSON(t *testing.T) {
 			err := json.Unmarshal([]byte(test.json), &e)
 
 			if err != nil && !test.err {
-				t.Errorf("expected success, got error | %s", err.Error())
+				t.Fatalf("expected success, got error | %s", err.Error())
 			}
 
 			if err == nil && test.err {
-				t.Error("expected error")
+				t.Fatal("expected error")
 			}
 
 			if !reflect.DeepEqual(test.expected, e) {
-				t.Errorf(
+				t.Fatalf(
 					"expected equality e[%s] != r[%s]",
 					spew.Sdump(test.expected),
 					spew.Sdump(e),
@@ -175,7 +175,7 @@ func TestElectron_Validate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if !validator.Valid(test.e) == test.valid {
-				t.Errorf("expected valid = %v", test.valid)
+				t.Fatalf("expected valid = %v", test.valid)
 			}
 		})
 	}

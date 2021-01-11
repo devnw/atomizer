@@ -82,17 +82,17 @@ func TestProperties_MarshalJSON(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			res, err := json.Marshal(test.p)
 			if err != nil && !test.err {
-				t.Errorf("expected success, got error | %s", err.Error())
+				t.Fatalf("expected success, got error | %s", err.Error())
 				return
 			}
 
 			if err == nil && test.err {
-				t.Error("expected error")
+				t.Fatal("expected error")
 				return
 			}
 
 			if strings.Compare(string(res), test.json) != 0 {
-				t.Errorf(
+				t.Fatalf(
 					"mismatch: e[%s] != r[%s]",
 					test.json,
 					string(res),
@@ -168,18 +168,18 @@ func TestProperties_UnmarshalJSON(t *testing.T) {
 			err := json.Unmarshal([]byte(test.json), &p)
 
 			if err != nil && !test.err {
-				t.Errorf("expected success, got error | %s", err.Error())
+				t.Fatalf("expected success, got error | %s", err.Error())
 				return
 			}
 
 			if err == nil && test.err {
-				t.Error("expected error")
+				t.Fatal("expected error")
 				return
 			}
 
 			if !test.err {
 				if cmp.Equal(test.p, p) != test.equal {
-					t.Errorf(
+					t.Fatalf(
 						"expected equality e[%s] != r[%s]",
 						spew.Sdump(test.p),
 						spew.Sdump(p),

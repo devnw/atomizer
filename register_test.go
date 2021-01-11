@@ -49,12 +49,12 @@ func TestRegister(t *testing.T) {
 
 			err := Register(test.value)
 			if err != nil && !test.err {
-				t.Error(err)
+				t.Fatal(err)
 			}
 
 			_, ok := registrant.Load(test.key)
 			if !ok && !test.err {
-				t.Errorf(
+				t.Fatalf(
 					"Test key [%s] failed to load",
 					test.key,
 				)
