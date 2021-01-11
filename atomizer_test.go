@@ -32,6 +32,18 @@ func printEvents(
 	}
 }
 
+func TestAtomizer_Atomize_Register_Fail(t *testing.T) {
+	// Register invalid atom
+	_, err := Atomize(
+		nil,
+		nil,
+		&struct{}{},
+	)
+	if err == nil {
+		t.Fatalf("expected error | %s", err)
+	}
+}
+
 func TestAtomizer_Exec(t *testing.T) {
 	d := time.Second * 30
 	// Setup a cancellation context for the test
