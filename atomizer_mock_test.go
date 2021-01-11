@@ -186,6 +186,12 @@ func (pt *passthrough) Close() {}
 
 type printer struct{}
 
+type state struct{ ID string }
+
+func (s *state) Process(ctx context.Context, conductor Conductor, electron Electron) (result []byte, err error) {
+	return []byte(s.ID), nil
+}
+
 func (p *printer) Process(ctx context.Context, conductor Conductor, electron Electron) (result []byte, err error) {
 
 	if validator.Valid(electron) {
@@ -285,7 +291,12 @@ func harness(
 	}
 
 	// Initialize the atomizer
-	a, _ := Atomize(ctx, events).(*atomizer)
+	mizer, err := Atomize(ctx, events)
+	if err != nil {
+		return nil, fmt.Errorf("error creating atomizer | %s", err)
+	}
+
+	a, _ := mizer.(*atomizer)
 
 	// Start the execution threads
 	return pass, a.Exec()

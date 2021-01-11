@@ -78,7 +78,7 @@ func TestError_Error(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			result := test.e.Error()
 			if result != test.expected {
-				t.Errorf(
+				t.Fatalf(
 					"expected [%s] got [%s]",
 					test.expected,
 					result,
@@ -99,7 +99,7 @@ func TestError_Unwrap(t *testing.T) {
 	}
 
 	if aerr.Unwrap() != e {
-		t.Errorf(
+		t.Fatalf(
 			"expected [%v] got [%v]",
 			e,
 			aerr.Unwrap(),
@@ -116,7 +116,7 @@ func TestError_Unwrap_Fail(t *testing.T) {
 	}
 
 	if aerr.Unwrap() != e {
-		t.Errorf(
+		t.Fatalf(
 			"expected [%v] got [%v]",
 			e,
 			aerr.Unwrap(),
@@ -153,7 +153,7 @@ func TestError_Validate(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			v := validator.Valid(test.e)
 			if test.valid != v {
-				t.Errorf(
+				t.Fatalf(
 					"expected [%v] got [%v]",
 					test.valid,
 					v,

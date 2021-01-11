@@ -26,8 +26,21 @@ type Atomizer interface {
 
 // Atomize initialize instance of the atomizer to start reading from
 // conductors and execute bonded electrons/atoms
-func Atomize(ctx context.Context, events chan interface{}) Atomizer {
-	return (&atomizer{events: events}).init(ctx)
+//
+// NOTE: Registrations can be added through this method and OVERRIDE any
+// existing registrations of the same Atom or Conductor.
+func Atomize(
+	ctx context.Context,
+	events chan interface{},
+	registrations ...interface{},
+) (Atomizer, error) {
+
+	err := Register(registrations...)
+	if err != nil {
+		return nil, err
+	}
+
+	return (&atomizer{events: events}).init(ctx), nil
 }
 
 // Exec kicks off the processing of the atomizer by pulling in the

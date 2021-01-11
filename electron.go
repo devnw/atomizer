@@ -38,6 +38,15 @@ type Electron struct {
 	// and a failure sent back to the conductor
 	Timeout *time.Duration
 
+	// CopyState lets atomizer know if it should copy the state of the
+	// original atom registration to the new atom instance when processing
+	// a newly received electron
+	//
+	// NOTE: Copying the state of an Atom as registered requires that ALL
+	// fields that are to be copied are **EXPORTED** otherwise they are
+	// skipped
+	CopyState bool
+
 	// Payload is to be used by the registered atom to properly unmarshal
 	// the []byte for the actual atom instance. RawMessage is used to
 	// delay unmarshal of the payload information so the atom can do it

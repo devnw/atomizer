@@ -31,33 +31,36 @@ func Registrations() []interface{} {
 // and allows them to be pre-registered using an init script rather than
 // having them passed in later at run time. This is useful for some situations
 // where the user may not want to register explicitly
-func Register(value interface{}) error {
-	// Validate the value coming into the register method
-	if !validator.Valid(value) {
-		return simple(
-			fmt.Sprintf(
-				"Invalid registration %s",
-				ID(value)),
-			nil,
-		)
+func Register(values ...interface{}) error {
 
-	}
+	for _, value := range values {
+		// Validate the value coming into the register method
+		if !validator.Valid(value) {
+			return simple(
+				fmt.Sprintf(
+					"Invalid registration %s",
+					ID(value)),
+				nil,
+			)
 
-	// Type assert the value to ensure we're only
-	// registering expected values in the maps
-	switch value.(type) {
-	case Conductor, Atom:
+		}
 
-		// Registrations using the same key will
-		// be overridden
-		registrant.Store(ID(value), value)
-	default:
-		return simple(
-			fmt.Sprintf(
-				"unsupported type %s",
-				ID(value)),
-			nil,
-		)
+		// Type assert the value to ensure we're only
+		// registering expected values in the maps
+		switch value.(type) {
+		case Conductor, Atom:
+
+			// Registrations using the same key will
+			// be overridden
+			registrant.Store(ID(value), value)
+		default:
+			return simple(
+				fmt.Sprintf(
+					"unsupported type %s",
+					ID(value)),
+				nil,
+			)
+		}
 	}
 
 	return nil

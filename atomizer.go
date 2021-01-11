@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/devnw/validator"
+	"github.com/mohae/deepcopy"
 )
 
 // atomizer facilitates the execution of tasks (aka Electrons) which
@@ -325,17 +326,25 @@ func (a *atomizer) _split(
 			// rather than on individually bonded
 			// instances
 
-			// Initialize a new copy of the atom
-			newAtom := reflect.New(
-				reflect.TypeOf(atom).Elem(),
-			)
+			var outatom Atom
+			// Copy the state of the original registration to
+			// the new atom
+			if inst.electron.CopyState {
+				outatom, _ = deepcopy.Copy(atom).(Atom)
+			} else {
 
-			// ok is not checked here because this should
-			// never fail since the originating data item
-			// is what created this
-			atom, _ := newAtom.Interface().(Atom)
+				// Initialize a new copy of the atom
+				newAtom := reflect.New(
+					reflect.TypeOf(atom).Elem(),
+				)
 
-			a.exec(inst, atom)
+				// ok is not checked here because this should
+				// never fail since the originating data item
+				// is what created this
+				outatom, _ = newAtom.Interface().(Atom)
+			}
+
+			a.exec(inst, outatom)
 		}
 	}
 }

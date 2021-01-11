@@ -66,7 +66,7 @@ func Test_instance_bond(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := test.inst.bond(test.atom)
 			if err != nil && !test.err {
-				t.Errorf(
+				t.Fatalf(
 					"expected success, got error %s",
 					err,
 				)
@@ -104,7 +104,7 @@ func Test_instance_complete(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := test.inst.bond(test.atom)
 			if err != nil && !test.err {
-				t.Errorf(
+				t.Fatalf(
 					"expected success, got error %s",
 					err,
 				)
@@ -176,7 +176,7 @@ func Test_instance_execute(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := test.inst.execute(ctx)
 			if err != nil && !test.err {
-				t.Errorf(
+				t.Fatalf(
 					"expected success, got error %s",
 					err,
 				)
@@ -245,7 +245,7 @@ func Test_instance_Validate(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			valid := test.inst.Validate()
 			if valid != test.valid {
-				t.Errorf(
+				t.Fatalf(
 					"valid mismatch, expected %v got %v",
 					valid,
 					test.inst.Validate(),
