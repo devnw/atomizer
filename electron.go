@@ -58,11 +58,12 @@ type Electron struct {
 // struct properly for use throughout Atomizer
 func (e *Electron) UnmarshalJSON(data []byte) error {
 	jsonE := struct {
-		SenderID string          `json:"senderid"`
-		ID       string          `json:"id"`
-		AtomID   string          `json:"atomid"`
-		Timeout  *time.Duration  `json:"timeout,omitempty"`
-		Payload  json.RawMessage `json:"payload,omitempty"`
+		SenderID  string          `json:"senderid"`
+		ID        string          `json:"id"`
+		AtomID    string          `json:"atomid"`
+		Timeout   *time.Duration  `json:"timeout,omitempty"`
+		CopyState bool            `json:"copystate,omitempty"`
+		Payload   json.RawMessage `json:"payload,omitempty"`
 	}{}
 
 	err := json.Unmarshal(data, &jsonE)
@@ -89,11 +90,12 @@ func (e *Electron) UnmarshalJSON(data []byte) error {
 // MarshalJSON implements the custom json marshaler for electron
 func (e Electron) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		SenderID string          `json:"senderid"`
-		ID       string          `json:"id"`
-		AtomID   string          `json:"atomid"`
-		Timeout  *time.Duration  `json:"timeout,omitempty"`
-		Payload  json.RawMessage `json:"payload,omitempty"`
+		SenderID  string          `json:"senderid"`
+		ID        string          `json:"id"`
+		AtomID    string          `json:"atomid"`
+		Timeout   *time.Duration  `json:"timeout,omitempty"`
+		CopyState bool            `json:"copystate,omitempty"`
+		Payload   json.RawMessage `json:"payload,omitempty"`
 	}{
 		SenderID: e.SenderID,
 		ID:       e.ID,
