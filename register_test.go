@@ -1,4 +1,4 @@
-package atomizer
+package engine
 
 import (
 	"testing"
