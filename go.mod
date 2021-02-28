@@ -1,12 +1,12 @@
-module github.com/devnw/atomizer
+module atomizer.io/engine
 
-go 1.14
+go 1.16
 
 require (
+	devnw.com/alog v1.0.3
+	devnw.com/validator v1.0.3
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/devnw/alog v1.0.2
-	github.com/devnw/validator v1.0.2
 	github.com/google/go-cmp v0.5.4
 	github.com/google/uuid v1.2.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826

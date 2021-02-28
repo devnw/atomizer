@@ -3,7 +3,7 @@ package atomizer
 import (
 	"testing"
 
-	"github.com/devnw/validator"
+	"devnw.com/validator"
 	"github.com/pkg/errors"
 )
 

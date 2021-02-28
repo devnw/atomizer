@@ -1,9 +1,9 @@
 # Atomizer - Massively Parallel Distributed Computing
 
 [![CI](https://github.com/devnw/atomizer/workflows/CI/badge.svg)](https://github.com/devnw/atomizer/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/devnw/atomizer)](https://goreportcard.com/report/github.com/devnw/atomizer)
+[![Go Report Card](https://goreportcard.com/badge/atomizer.io/engine)](https://goreportcard.com/report/atomizer.io/engine)
 [![codecov](https://codecov.io/gh/devnw/atomizer/branch/master/graph/badge.svg)](https://codecov.io/gh/devnw/atomizer)
-[![GoDoc](https://godoc.org/github.com/devnw/atomizer?status.svg)](https://pkg.go.dev/github.com/devnw/atomizer)
+[![Go Reference](https://pkg.go.dev/badge/atomizer.io/engine.svg)](https://pkg.go.dev/atomizer.io/engine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
@@ -34,7 +34,7 @@ executed in the atomizer runtime.
 To use Atomizer you will first need to pull a copy down.
 
 ```go
-go get -u github.com/devnw/atomizer
+go get -u atomizer.io/engine
 ```
 
 I highly recommend checking out the [Test App](#test-app) for a functional
@@ -43,7 +43,7 @@ example of the Atomizer framework in action.
 To create an instance of Atomizer in your app you will need a Conductor
 ([def](docs/definitions.md#conductor)). Currently there is an AMQP conductor
 that was built for the creation of Atomizer which can be found
-at ([github.com/devnw/amqp](https://github.com/devnw/amqp)), or you can create
+at ([atomizer.io/amqp](https://github.com/devnw/amqp)), or you can create
 your own conductor by following the
 [Conductor creation instructions](#conductor-creation).
 

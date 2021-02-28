@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"devnw.com/validator"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/devnw/validator"
 )
 
 var pay = `{"test":"test"}`

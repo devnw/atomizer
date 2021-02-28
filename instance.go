@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/devnw/validator"
+	"devnw.com/validator"
 )
 
 type instance struct {

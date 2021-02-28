@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"devnw.com/validator"
 	"github.com/Pallinder/go-randomdata"
-	"github.com/devnw/validator"
 	"github.com/google/uuid"
 )
 

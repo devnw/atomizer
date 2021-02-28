@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/devnw/validator"
+	"devnw.com/validator"
 )
 
 var registrant sync.Map

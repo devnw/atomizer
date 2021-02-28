@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync"
 
+	"devnw.com/alog"
+	"devnw.com/validator"
 	"github.com/Pallinder/go-randomdata"
-	"github.com/devnw/alog"
-	"github.com/devnw/validator"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
