@@ -17,7 +17,6 @@ func printEvents(
 	t *testing.T,
 	events <-chan interface{},
 ) {
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -35,7 +34,7 @@ func printEvents(
 func TestAtomizer_Atomize_Register_Fail(t *testing.T) {
 	// Register invalid atom
 	_, err := Atomize(
-		nil,
+		context.TODO(),
 		nil,
 		&struct{}{},
 	)
@@ -47,13 +46,13 @@ func TestAtomizer_Atomize_Register_Fail(t *testing.T) {
 func TestAtomizer_Exec(t *testing.T) {
 	d := time.Second * 30
 	// Setup a cancellation context for the test
-	ctx, cancel := _ctxT(nil, &d)
+	ctx, cancel := _ctxT(context.TODO(), &d)
 	defer cancel()
 
 	// Execute clean at beginning and end
 	reset(ctx, t)
 	t.Cleanup(func() {
-		reset(nil, t)
+		reset(context.TODO(), t)
 	})
 
 	events := make(chan interface{}, 1000)
@@ -91,6 +90,21 @@ func TestAtomizer_Exec(t *testing.T) {
 	}
 
 	t.Log("read result from passthrough conductor")
+	check(ctx, t, test, e, result)
+
+	t.Logf(
+		"Processing Time Through Atomizer %s\n",
+		time.Since(sent).String(),
+	)
+}
+
+func check(
+	ctx context.Context,
+	t *testing.T,
+	test *tresult,
+	e *Electron,
+	result <-chan *Properties,
+) {
 	// Block until a result is returned from the instance
 	select {
 	case <-ctx.Done():
@@ -124,23 +138,18 @@ func TestAtomizer_Exec(t *testing.T) {
 			result.End.Sub(result.Start).String(),
 		)
 	}
-
-	t.Logf(
-		"Processing Time Through Atomizer %s\n",
-		time.Since(sent).String(),
-	)
 }
 
 func TestAtomizer_initReg_Exec(t *testing.T) {
 	d := time.Second * 30
 	// Setup a cancellation context for the test
-	ctx, cancel := _ctxT(nil, &d)
+	ctx, cancel := _ctxT(context.TODO(), &d)
 	defer cancel()
 
 	// Execute clean at beginning and end
 	reset(ctx, t)
 	t.Cleanup(func() {
-		reset(nil, t)
+		reset(context.TODO(), t)
 	})
 
 	events := make(chan interface{}, 1000)
@@ -150,7 +159,7 @@ func TestAtomizer_initReg_Exec(t *testing.T) {
 		ctx,
 		events,
 		&passthrough{
-			input: make(chan Electron, 1),
+			input: make(chan *Electron, 1),
 		},
 		&printer{},
 		&noopatom{},
@@ -198,39 +207,7 @@ func TestAtomizer_initReg_Exec(t *testing.T) {
 	}
 
 	t.Log("read result from passthrough conductor")
-	// Block until a result is returned from the instance
-	select {
-	case <-ctx.Done():
-		t.Fatal("context closed, test failed")
-		return
-	case result, ok := <-result:
-		if !ok {
-			t.Fatal("result channel closed, test failed")
-			return
-		}
-
-		if result.Error != nil {
-			t.Fatal("Errors returned from atom", e)
-			return
-		}
-
-		if len(result.Result) == 0 {
-			t.Fatal("results length is not 1")
-			return
-		}
-
-		res := string(result.Result)
-		if res != test.result {
-			t.Fatalf("%s != %s", test.result, res)
-			return
-		}
-
-		t.Logf(
-			"EID [%s] | Time [%s] - MATCH",
-			result.ElectronID,
-			result.End.Sub(result.Start).String(),
-		)
-	}
+	check(ctx, t, test, e, result)
 
 	t.Logf(
 		"Processing Time Through Atomizer %s\n",
@@ -241,13 +218,13 @@ func TestAtomizer_initReg_Exec(t *testing.T) {
 func TestAtomizer_Copy_State(t *testing.T) {
 	d := time.Second * 30
 	// Setup a cancellation context for the test
-	ctx, cancel := _ctxT(nil, &d)
+	ctx, cancel := _ctxT(context.TODO(), &d)
 	defer cancel()
 
 	// Execute clean at beginning and end
 	reset(ctx, t)
 	t.Cleanup(func() {
-		reset(nil, t)
+		reset(context.TODO(), t)
 	})
 
 	events := make(chan interface{}, 1000)
@@ -258,7 +235,7 @@ func TestAtomizer_Copy_State(t *testing.T) {
 		ctx,
 		events,
 		&passthrough{
-			input: make(chan Electron, 1),
+			input: make(chan *Electron, 1),
 		},
 		&state{ID: stateid},
 	)
@@ -281,7 +258,7 @@ func TestAtomizer_Copy_State(t *testing.T) {
 	go printEvents(ctx, t, events)
 
 	t.Log("creating test electron")
-	e := Electron{
+	e := &Electron{
 		SenderID:  uuid.New().String(),
 		ID:        uuid.New().String(),
 		AtomID:    ID(state{}),
@@ -336,13 +313,13 @@ func TestAtomizer_Copy_State(t *testing.T) {
 func TestAtomizer_Copy_State_Disabled(t *testing.T) {
 	d := time.Second * 30
 	// Setup a cancellation context for the test
-	ctx, cancel := _ctxT(nil, &d)
+	ctx, cancel := _ctxT(context.TODO(), &d)
 	defer cancel()
 
 	// Execute clean at beginning and end
 	reset(ctx, t)
 	t.Cleanup(func() {
-		reset(nil, t)
+		reset(context.TODO(), t)
 	})
 
 	events := make(chan interface{}, 1000)
@@ -353,7 +330,7 @@ func TestAtomizer_Copy_State_Disabled(t *testing.T) {
 		ctx,
 		events,
 		&passthrough{
-			input: make(chan Electron, 1),
+			input: make(chan *Electron, 1),
 		},
 		&state{ID: stateid},
 	)
@@ -376,7 +353,7 @@ func TestAtomizer_Copy_State_Disabled(t *testing.T) {
 	go printEvents(ctx, t, events)
 
 	t.Log("creating test electron")
-	e := Electron{
+	e := &Electron{
 		SenderID:  uuid.New().String(),
 		ID:        uuid.New().String(),
 		AtomID:    ID(state{}),
@@ -429,12 +406,12 @@ func TestAtomizer_Copy_State_Disabled(t *testing.T) {
 }
 
 func TestAtomizer_Exec_Returner(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	defer cancel()
 
 	reset(ctx, t)
 	t.Cleanup(func() {
-		reset(nil, t)
+		reset(context.TODO(), t)
 	})
 
 	t.Log("Initializing Test Harness")
@@ -459,7 +436,6 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 		defer cancel()
 
 		for _, test := range tests {
-
 			wg.Add(1)
 			go func(test *tresult) {
 				defer wg.Done()
@@ -536,7 +512,7 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 		{
 			"ValidTestValidConductor",
-			&validconductor{make(chan Electron), true},
+			&validconductor{make(chan *Electron), true},
 			false,
 		},
 		{
@@ -556,14 +532,14 @@ func TestAtomizeNoConductors(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	defer cancel()
 
 	for _, test := range tests {
 		t.Run(test.key, func(t *testing.T) {
 			reset(ctx, t)
 			t.Cleanup(func() {
-				reset(nil, t)
+				reset(context.TODO(), t)
 			})
 
 			// Store the test conductor
@@ -586,13 +562,12 @@ func TestAtomizeNoConductors(t *testing.T) {
 			if !validator.Valid(a) {
 				t.Fatalf("atomizer was expected to be valid but was returned invalid")
 			}
-
 		})
 	}
 }
 
 func TestAtomizer_AddConductor(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	defer cancel()
 
 	tests := []struct {
@@ -602,12 +577,12 @@ func TestAtomizer_AddConductor(t *testing.T) {
 	}{
 		{
 			"ValidTestEmptyConductor",
-			&validconductor{make(chan Electron), true},
+			&validconductor{make(chan *Electron), true},
 			false,
 		},
 		{
 			"InvalidTestConductor",
-			&validconductor{make(chan Electron), false},
+			&validconductor{make(chan *Electron), false},
 			true,
 		},
 		{
@@ -623,12 +598,11 @@ func TestAtomizer_AddConductor(t *testing.T) {
 	}
 
 	for _, test := range tests {
-
 		t.Run(test.key, func(t *testing.T) {
 			// Reset sync map for this test
 			reset(ctx, t)
 			t.Cleanup(func() {
-				reset(nil, t)
+				reset(context.TODO(), t)
 			})
 
 			a, err := Atomize(ctx, nil)
@@ -651,7 +625,7 @@ func TestAtomizer_AddConductor(t *testing.T) {
 }
 
 func TestAtomizer_register_Errs(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	defer cancel()
 
 	tests := []struct {
@@ -672,7 +646,6 @@ func TestAtomizer_register_Errs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-
 		t.Run(test.key, func(t *testing.T) {
 			events := test.a.Events(1)
 
@@ -685,13 +658,12 @@ func TestAtomizer_register_Errs(t *testing.T) {
 			}
 
 			t.Log(out)
-
 		})
 	}
 }
 
 func TestAtomizer_Register_Errs(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	cancel()
 
 	tests := []struct {
@@ -702,12 +674,12 @@ func TestAtomizer_Register_Errs(t *testing.T) {
 		{
 			"panic test, nil channels",
 			&atomizer{},
-			&validconductor{make(chan Electron), true},
+			&validconductor{make(chan *Electron), true},
 		},
 		{
 			"close context test",
 			&atomizer{ctx: ctx},
-			&validconductor{make(chan Electron), true},
+			&validconductor{make(chan *Electron), true},
 		},
 		{
 			"Invalid Struct Type",
@@ -717,9 +689,7 @@ func TestAtomizer_Register_Errs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-
 		t.Run(test.key, func(t *testing.T) {
-
 			// Add the conductor
 			err := test.a.Register(test.value)
 			if err == nil {
@@ -772,7 +742,7 @@ func TestAtomizer_Events_NegBuff(t *testing.T) {
 }
 
 func TestAtomizer_event(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	cancel()
 
 	a := &atomizer{ctx: ctx}
@@ -882,7 +852,7 @@ func TestAtomizer_receiveAtom_invalid(t *testing.T) {
 }
 
 func TestAtomizer_conduct_closedreceiver(t *testing.T) {
-	c := &validconductor{echan: make(chan Electron)}
+	c := &validconductor{echan: make(chan *Electron)}
 	close(c.echan)
 
 	a := &atomizer{ctx: context.Background()}
@@ -904,7 +874,7 @@ func TestAtomizer_conduct_closedreceiver(t *testing.T) {
 }
 
 func TestAtomizer_conduct_panic(t *testing.T) {
-	c := &validconductor{echan: make(chan Electron)}
+	c := &validconductor{echan: make(chan *Electron)}
 	close(c.echan)
 
 	a := &atomizer{}
@@ -930,7 +900,7 @@ func TestAtomizer_conduct_panic(t *testing.T) {
 }
 
 func TestAtomizer_conduct_invalidE(t *testing.T) {
-	c := &passthrough{input: make(chan Electron)}
+	c := &passthrough{input: make(chan *Electron)}
 	a := &atomizer{ctx: context.Background()}
 	go a.conduct(context.Background(), c)
 
@@ -975,7 +945,7 @@ func TestAtomizer_split_closedEchan(t *testing.T) {
 }
 
 func TestAtomizer_Wait(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	a := &atomizer{
 		ctx:    ctx,
 		cancel: cancel,
@@ -986,7 +956,7 @@ func TestAtomizer_Wait(t *testing.T) {
 }
 
 func TestAtomizer_distribute_closedEchan(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	a := &atomizer{
 		ctx:       ctx,
 		cancel:    cancel,
@@ -1011,7 +981,7 @@ func TestAtomizer_distribute_closedEchan(t *testing.T) {
 }
 
 func TestAtomizer_exec_ERR(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	a := &atomizer{
 		ctx:    ctx,
 		cancel: cancel,
@@ -1035,7 +1005,7 @@ func TestAtomizer_exec_ERR(t *testing.T) {
 }
 
 func TestAtomizer_distribute_unregistered(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	a := &atomizer{
 		ctx:       ctx,
 		cancel:    cancel,
@@ -1046,7 +1016,7 @@ func TestAtomizer_distribute_unregistered(t *testing.T) {
 	i := instance{
 		ctx:      ctx,
 		cancel:   cancel,
-		electron: Electron{AtomID: "nopey.nope"},
+		electron: &Electron{AtomID: "nopey.nope"},
 	}
 
 	go a.distribute()
@@ -1065,7 +1035,7 @@ func TestAtomizer_distribute_unregistered(t *testing.T) {
 }
 
 func TestAtomizer_exec_inst_err(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	a := &atomizer{
 		ctx:       ctx,
 		cancel:    cancel,
@@ -1134,18 +1104,17 @@ func TestAtomizer_Validate(t *testing.T) {
 	}
 }
 
-//********************************
+// ********************************
 // BENCHMARKS
-//********************************
+// ********************************
 
 func BenchmarkAtomizer_Exec_Single(b *testing.B) {
-
 	resetB()
 	b.Cleanup(func() {
 		resetB()
 	})
 
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	defer cancel()
 
 	conductor, err := harness(ctx, nil)

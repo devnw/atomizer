@@ -1,12 +1,12 @@
 package engine
 
 import (
+	"context"
 	"testing"
 )
 
 func Test_instance_bond(t *testing.T) {
-
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 
 	tests := []struct {
 		name string
@@ -73,12 +73,10 @@ func Test_instance_bond(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func Test_instance_complete(t *testing.T) {
-
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 
 	tests := []struct {
 		name string
@@ -111,12 +109,10 @@ func Test_instance_complete(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func Test_instance_execute(t *testing.T) {
-
-	ctx, _ := _ctx(nil)
+	ctx, _ := _ctx(context.TODO())
 
 	tests := []struct {
 		name string
@@ -183,11 +179,9 @@ func Test_instance_execute(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func Test_instance_Validate(t *testing.T) {
-
 	tests := []struct {
 		name  string
 		inst  instance
@@ -213,7 +207,7 @@ func Test_instance_Validate(t *testing.T) {
 		{
 			"invalid instance / invalid electron",
 			instance{
-				electron: Electron{
+				electron: &Electron{
 					SenderID: "empty",
 					ID:       "empty",
 				},
@@ -225,7 +219,7 @@ func Test_instance_Validate(t *testing.T) {
 		{
 			"invalid instance / invalid electron",
 			instance{
-				electron:  Electron{},
+				electron:  &Electron{},
 				conductor: &noopconductor{},
 				atom:      &noopatom{},
 			},
@@ -253,5 +247,4 @@ func Test_instance_Validate(t *testing.T) {
 			}
 		})
 	}
-
 }

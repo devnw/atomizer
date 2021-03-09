@@ -15,6 +15,6 @@ type Atom interface {
 	Process(
 		ctx context.Context,
 		conductor Conductor,
-		electron Electron,
+		electron *Electron,
 	) ([]byte, error)
 }

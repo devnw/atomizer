@@ -17,7 +17,7 @@ func TestError_Error(t *testing.T) {
 	}{
 		{
 			"error w/message test",
-			Error{
+			&Error{
 				Event: Event{
 					Message: "test",
 				},
@@ -26,15 +26,15 @@ func TestError_Error(t *testing.T) {
 		},
 		{
 			"error w/empty message test",
-			Error{
+			&Error{
 				Event: Event{},
 			},
 			prefix,
 		},
 		{
 			"error w/inner error test",
-			Error{
-				Internal: Error{
+			&Error{
+				Internal: &Error{
 					Event: Event{
 						Message: "test",
 					},
@@ -44,12 +44,12 @@ func TestError_Error(t *testing.T) {
 		},
 		{
 			"error w/multiple inner error test",
-			Error{
-				Internal: Error{
+			&Error{
+				Internal: &Error{
 					Event: Event{
 						Message: "test",
 					},
-					Internal: Error{
+					Internal: &Error{
 						Event: Event{
 							Message: "test 2",
 						},
@@ -89,11 +89,10 @@ func TestError_Error(t *testing.T) {
 }
 
 func TestError_Unwrap(t *testing.T) {
-
 	e := errors.New("wrapped error")
 
-	aerr := Error{
-		Internal: Error{
+	aerr := &Error{
+		Internal: &Error{
 			Internal: e,
 		},
 	}
@@ -108,10 +107,9 @@ func TestError_Unwrap(t *testing.T) {
 }
 
 func TestError_Unwrap_Fail(t *testing.T) {
-
 	e := errors.New("wrapped error")
 
-	aerr := Error{
+	aerr := &Error{
 		Internal: e,
 	}
 
@@ -125,7 +123,6 @@ func TestError_Unwrap_Fail(t *testing.T) {
 }
 
 func TestError_Validate(t *testing.T) {
-
 	tests := []struct {
 		name  string
 		e     error
@@ -133,7 +130,7 @@ func TestError_Validate(t *testing.T) {
 	}{
 		{
 			"error w/valid event",
-			Error{
+			&Error{
 				Event: Event{
 					Message: "test",
 				},
@@ -142,7 +139,7 @@ func TestError_Validate(t *testing.T) {
 		},
 		{
 			"error w/invalid event",
-			Error{
+			&Error{
 				Event: Event{},
 			},
 			false,

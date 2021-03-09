@@ -38,7 +38,6 @@ type Event struct {
 }
 
 func (e Event) String() string {
-
 	var joins []string
 
 	ids := e.ids()

@@ -5,7 +5,6 @@ import (
 )
 
 func TestEvent_String(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		e        Event

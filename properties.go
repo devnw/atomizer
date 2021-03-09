@@ -44,8 +44,7 @@ func (p *Properties) UnmarshalJSON(data []byte) error {
 	}
 
 	if jsonP.Error != nil {
-
-		e := Error{}
+		e := &Error{}
 		err := json.Unmarshal(jsonP.Error, &e)
 		if err == nil {
 			p.Error = e
@@ -64,10 +63,10 @@ func (p *Properties) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON implements the custom json marshaler for properties
-func (p Properties) MarshalJSON() ([]byte, error) {
+func (p *Properties) MarshalJSON() ([]byte, error) {
 	var eString []byte
 	if p.Error != nil {
-		_, ok := p.Error.(Error)
+		_, ok := p.Error.(*Error)
 		if ok {
 			var err error
 			eString, err = json.Marshal(p.Error)
@@ -97,8 +96,8 @@ func (p Properties) MarshalJSON() ([]byte, error) {
 }
 
 // Equal determines if two properties structs are equal to eachother
-func (p Properties) Equal(p2 Properties) bool {
-
+// TODO: Should this use reflect.DeepEqual?
+func (p *Properties) Equal(p2 *Properties) bool {
 	var eEquals bool
 	if p.Error != nil {
 		if p2.Error != nil {

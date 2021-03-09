@@ -1,13 +1,14 @@
 package engine
 
 import (
+	"context"
 	"testing"
 )
 
 type invalidTestStruct struct{}
 
 func TestRegister(t *testing.T) {
-	ctx, cancel := _ctx(nil)
+	ctx, cancel := _ctx(context.TODO())
 	defer cancel()
 
 	tests := []struct {
@@ -45,7 +46,7 @@ func TestRegister(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			reset(ctx, t)
-			defer reset(nil, t)
+			defer reset(context.TODO(), t)
 
 			err := Register(test.value)
 			if err != nil && !test.err {

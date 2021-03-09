@@ -1,44 +1,26 @@
-name: CI
+name: Build & Test
 
 # this is triggered on push to the repository
 on: [push, pull_request]
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      matrix:
+        go-version: [1.15.x, 1.16.x]
+        platform: [ubuntu-latest, macos-latest, windows-latest]
+      fail-fast: true
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.16.x
-      - name: Execute gofmt
-        run: gofmt -s .
-      - name: Execute golint
-        run: |
-          go get -u golang.org/x/lint/golint
-          golint -set_exit_status ./...
-      - name: Execute ineffassign
-        run: |
-          go get -u github.com/gordonklaus/ineffassign
-          ineffassign ./...
-      - name: Execute misspell
-        run: |
-          go get -u github.com/client9/misspell/cmd/misspell
-          misspell ./...
-      - name: Execute errcheck
-        run: |
-          go get -u github.com/kisielk/errcheck
-          errcheck ./...
-      - name: Execute gosec
-        run: |
-          go get -u github.com/securego/gosec/cmd/gosec
-          gosec ./...
-      - name: Execute staticcheck
-        run: |
-          go get -u honnef.co/go/tools/cmd/staticcheck
-          staticcheck -tests=0 ./...
-      - name: Execute go vet
-        run: go vet -race ./...
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build
+        run: go build ./...
   test:
     strategy:
       matrix:
@@ -57,20 +39,3 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.txt
-  build:
-    strategy:
-      matrix:
-        go-version: [1.15.x, 1.16.x]
-        platform: [ubuntu-latest, macos-latest, windows-latest]
-      fail-fast: true
-    runs-on: ${{ matrix.platform }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Build
-        run: go build ./...

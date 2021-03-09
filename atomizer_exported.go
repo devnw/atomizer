@@ -34,7 +34,6 @@ func Atomize(
 	events chan interface{},
 	registrations ...interface{},
 ) (Atomizer, error) {
-
 	err := Register(registrations...)
 	if err != nil {
 		return nil, err
@@ -47,10 +46,8 @@ func Atomize(
 // pre-registrations through init calls on imported libraries and
 // starts up the receivers for atoms and conductors
 func (a *atomizer) Exec() (err error) {
-
 	// Execute on the atomizer should only ever be run once
 	a.execSyncOnce.Do(func() {
-
 		a.event("pulling conductor and atom registrations")
 
 		// Start up the receivers
@@ -64,8 +61,6 @@ func (a *atomizer) Exec() (err error) {
 		// TODO: Setup the instance receivers for monitoring of
 		// individual instances as well as sending of outbound
 		// electrons
-
-		//err = a.Register(Registrations()...)
 	})
 
 	return err
@@ -76,7 +71,7 @@ func (a *atomizer) Exec() (err error) {
 func (a *atomizer) Register(values ...interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = Error{
+			err = &Error{
 				Event: Event{
 					Message: "panic in atomizer",
 				},
@@ -110,7 +105,6 @@ func (a *atomizer) Register(values ...interface{}) (err error) {
 				nil,
 			)
 		}
-
 	}
 
 	return err
@@ -119,7 +113,6 @@ func (a *atomizer) Register(values ...interface{}) (err error) {
 // Events creates a channel to receive events from the atomizer and
 // return the channel for logging purposes
 func (a *atomizer) Events(buffer int) <-chan interface{} {
-
 	if buffer < 0 {
 		buffer = 0
 	}

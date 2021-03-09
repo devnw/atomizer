@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	gob.Register(Error{})
+	gob.Register(&Error{})
 }
 
 type wrappedErr interface {
@@ -20,7 +20,7 @@ type wrappedErr interface {
 }
 
 func simple(msg string, internal error) error {
-	return Error{
+	return &Error{
 		Event: Event{
 			Message: msg,
 		},
@@ -31,7 +31,7 @@ func simple(msg string, internal error) error {
 // ptoe takes a result of a recover and coverts it
 // to a string
 func ptoe(r interface{}) error {
-	return Error{
+	return &Error{
 		Event: makeEvent(ptos(r)),
 	}
 }
@@ -54,11 +54,11 @@ type Error struct {
 	Internal error `json:"internal"`
 }
 
-func (e Error) Error() string {
+func (e *Error) Error() string {
 	return e.String()
 }
 
-func (e Error) String() string {
+func (e *Error) String() string {
 	var fields []string
 
 	fields = append(fields, "atomizer error")
@@ -79,15 +79,13 @@ func (e Error) String() string {
 }
 
 // Unwrap unwraps the error to the deepest error and returns that one
-func (e Error) Unwrap() (err error) {
-
+func (e *Error) Unwrap() (err error) {
 	err = e.Internal
 
 	// Determine if the internal error implements
 	// the wrappedErr interface then continue unwrapping
 	// if it does
 	if internal, ok := err.(wrappedErr); ok {
-
 		// Recursive unwrap to get the lowest error
 		err = internal.Unwrap()
 	}
@@ -96,6 +94,6 @@ func (e Error) Unwrap() (err error) {
 }
 
 // Validate determines if this is a properly built error
-func (e Error) Validate() bool {
+func (e *Error) Validate() bool {
 	return e.Event.Validate()
 }

@@ -34,7 +34,7 @@ type Electron struct {
 
 	// Timeout is the maximum time duration that should be allowed
 	// for this instance to process. After the duration is exceeded
-	// the context should be cancelled and the processing released
+	// the context should be canceled and the processing released
 	// and a failure sent back to the conductor
 	Timeout *time.Duration
 
@@ -88,7 +88,7 @@ func (e *Electron) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON implements the custom json marshaler for electron
-func (e Electron) MarshalJSON() ([]byte, error) {
+func (e *Electron) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		SenderID  string          `json:"senderid"`
 		ID        string          `json:"id"`
@@ -107,11 +107,11 @@ func (e Electron) MarshalJSON() ([]byte, error) {
 
 // Validate ensures that the electron information is intact for proper
 // execution
-func (e Electron) Validate() (valid bool) {
-	if e.SenderID != "" &&
+func (e *Electron) Validate() (valid bool) {
+	if e != nil &&
+		e.SenderID != "" &&
 		e.ID != "" &&
 		e.AtomID != "" {
-
 		valid = true
 	}
 

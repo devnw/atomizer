@@ -20,7 +20,6 @@ func Registrations() []interface{} {
 	registrations := make([]interface{}, 0)
 
 	registrant.Range(func(key, value interface{}) bool {
-
 		registrations = append(registrations, value)
 		return true
 	})
@@ -32,7 +31,6 @@ func Registrations() []interface{} {
 // having them passed in later at run time. This is useful for some situations
 // where the user may not want to register explicitly
 func Register(values ...interface{}) error {
-
 	for _, value := range values {
 		// Validate the value coming into the register method
 		if !validator.Valid(value) {
@@ -42,14 +40,12 @@ func Register(values ...interface{}) error {
 					ID(value)),
 				nil,
 			)
-
 		}
 
 		// Type assert the value to ensure we're only
 		// registering expected values in the maps
 		switch value.(type) {
 		case Conductor, Atom:
-
 			// Registrations using the same key will
 			// be overridden
 			registrant.Store(ID(value), value)

@@ -13,7 +13,7 @@ import (
 )
 
 type instance struct {
-	electron   Electron
+	electron   *Electron
 	conductor  Conductor
 	atom       Atom
 	properties *Properties
@@ -29,18 +29,15 @@ type instance struct {
 // the execute method of the instance can properly exercise the
 // Process method of the interface
 func (i *instance) bond(atom Atom) (err error) {
-
 	if err = validator.Assert(
 		i.electron,
 		i.conductor,
 		atom,
 	); err != nil {
-
-		return Error{
+		return &Error{
 			Event: Event{
-				Message:    "error while bonding atom instance",
-				AtomID:     ID(atom),
-				ElectronID: i.electron.ID,
+				Message: "error while bonding atom instance",
+				AtomID:  ID(atom),
 			},
 			Internal: err,
 		}
@@ -56,12 +53,11 @@ func (i *instance) bond(atom Atom) (err error) {
 // complete marks the completion of execution and pushes
 // the results to the conductor
 func (i *instance) complete() error {
-
 	// Set the end time and status in the properties
 	i.properties.End = time.Now()
 
 	if !validator.Valid(i.conductor) {
-		return Error{
+		return &Error{
 			Event: Event{
 				Message:    "conductor validation failed",
 				AtomID:     ID(i.atom),
@@ -71,14 +67,14 @@ func (i *instance) complete() error {
 	}
 
 	// Push the completed instance properties to the conductor
-	return i.conductor.Complete(i.ctx, *i.properties)
+	return i.conductor.Complete(i.ctx, i.properties)
 }
 
 // execute runs the process method on the bonded atom / electron pair
 func (i *instance) execute(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = Error{
+			err = &Error{
 				Event: Event{
 					Message:    "panic in atomizer",
 					AtomID:     ID(i.atom),
@@ -99,12 +95,10 @@ func (i *instance) execute(ctx context.Context) (err error) {
 	// ensure the instance is valid before attempting
 	// to execute processing
 	if !validator.Valid(i) {
-
-		return Error{
+		return &Error{
 			Event: Event{
-				Message:    "instance validation failed",
-				AtomID:     ID(i.atom),
-				ElectronID: i.electron.ID,
+				Message: "instance validation failed",
+				AtomID:  ID(i.atom),
 			},
 		}
 	}
@@ -147,21 +141,14 @@ func (i *instance) execute(ctx context.Context) (err error) {
 	return nil
 }
 
-// Cancel the instance context
-func (i *instance) Cancel() {
-	i.cancel()
-}
-
 // Validate ensures that the instance has the correct
 // non-nil values internally so that it functions properly
 func (i *instance) Validate() (valid bool) {
-
 	if i != nil {
 		if validator.Valid(
 			i.electron,
 			i.conductor,
 			i.atom) {
-
 			valid = true
 		}
 	}

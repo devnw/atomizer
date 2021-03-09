@@ -3,18 +3,17 @@ package engine
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 
 	"devnw.com/validator"
-	"github.com/davecgh/go-spew/spew"
+	"github.com/google/go-cmp/cmp"
 )
 
 var pay = `{"test":"test"}`
 var pay64Encoded = `eyJ0ZXN0IjoidGVzdCJ9`
 
-var nonb64 = Electron{
+var nonb64 = &Electron{
 	SenderID: "empty",
 	ID:       "empty",
 	AtomID:   "empty",
@@ -22,10 +21,9 @@ var nonb64 = Electron{
 }
 
 func TestElectron_MarshalJSON(t *testing.T) {
-
 	tests := []struct {
 		name     string
-		e        Electron
+		e        *Electron
 		expected string
 		err      bool
 	}{
@@ -66,10 +64,9 @@ func TestElectron_MarshalJSON(t *testing.T) {
 }
 
 func TestElectron_UnmarshalJSON(t *testing.T) {
-
 	tests := []struct {
 		name     string
-		expected Electron
+		expected *Electron
 		json     string
 		err      bool
 	}{
@@ -93,7 +90,7 @@ func TestElectron_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			"invalid json blob",
-			Electron{},
+			&Electron{},
 			`{"empty"}`,
 			true,
 		},
@@ -101,7 +98,7 @@ func TestElectron_UnmarshalJSON(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			e := Electron{}
+			e := &Electron{}
 			err := json.Unmarshal([]byte(test.json), &e)
 
 			if err != nil && !test.err {
@@ -112,11 +109,11 @@ func TestElectron_UnmarshalJSON(t *testing.T) {
 				t.Fatal("expected error")
 			}
 
-			if !reflect.DeepEqual(test.expected, e) {
+			diff := cmp.Diff(test.expected, e)
+			if diff != "" {
 				t.Fatalf(
-					"expected equality e[%s] != r[%s]",
-					spew.Sdump(test.expected),
-					spew.Sdump(e),
+					"expected equality %s",
+					diff,
 				)
 			}
 		})
@@ -124,10 +121,9 @@ func TestElectron_UnmarshalJSON(t *testing.T) {
 }
 
 func TestElectron_Validate(t *testing.T) {
-
 	tests := []struct {
 		name  string
-		e     Electron
+		e     *Electron
 		valid bool
 	}{
 		{
@@ -137,37 +133,37 @@ func TestElectron_Validate(t *testing.T) {
 		},
 		{
 			"invalid electron",
-			Electron{},
+			&Electron{},
 			false,
 		},
 		{
 			"invalid electron / only sender",
-			Electron{SenderID: "test"},
+			&Electron{SenderID: "test"},
 			false,
 		},
 		{
 			"invalid electron / only atom",
-			Electron{AtomID: "test"},
+			&Electron{AtomID: "test"},
 			false,
 		},
 		{
 			"invalid electron / only ID",
-			Electron{ID: "test"},
+			&Electron{ID: "test"},
 			false,
 		},
 		{
 			"invalid electron / sender & atom",
-			Electron{SenderID: "test", AtomID: "test"},
+			&Electron{SenderID: "test", AtomID: "test"},
 			false,
 		},
 		{
 			"invalid electron / ID & sender",
-			Electron{ID: "test", SenderID: "test"},
+			&Electron{ID: "test", SenderID: "test"},
 			false,
 		},
 		{
 			"invalid electron / ID & atom",
-			Electron{ID: "test", AtomID: "test"},
+			&Electron{ID: "test", AtomID: "test"},
 			false,
 		},
 	}
