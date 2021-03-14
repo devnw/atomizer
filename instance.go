@@ -35,7 +35,7 @@ func (i *instance) bond(atom Atom) (err error) {
 		atom,
 	); err != nil {
 		return &Error{
-			Event: Event{
+			Event: &Event{
 				Message: "error while bonding atom instance",
 				AtomID:  ID(atom),
 			},
@@ -58,7 +58,7 @@ func (i *instance) complete() error {
 
 	if !validator.Valid(i.conductor) {
 		return &Error{
-			Event: Event{
+			Event: &Event{
 				Message:    "conductor validation failed",
 				AtomID:     ID(i.atom),
 				ElectronID: i.electron.ID,
@@ -75,7 +75,7 @@ func (i *instance) execute(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = &Error{
-				Event: Event{
+				Event: &Event{
 					Message:    "panic in atomizer",
 					AtomID:     ID(i.atom),
 					ElectronID: i.electron.ID,
@@ -96,7 +96,7 @@ func (i *instance) execute(ctx context.Context) (err error) {
 	// to execute processing
 	if !validator.Valid(i) {
 		return &Error{
-			Event: Event{
+			Event: &Event{
 				Message: "instance validation failed",
 				AtomID:  ID(i.atom),
 			},

@@ -17,11 +17,12 @@ type Atomizer interface {
 	Exec() error
 	Register(value ...interface{}) error
 	Events(buffer int) <-chan interface{}
+	Errors(buffer int) <-chan error
 	Wait()
 
 	// private methods enforce only this
 	// package can return an atomizer
-	init(context.Context) *atomizer
+	isAtomizer()
 }
 
 // Atomize initialize instance of the atomizer to start reading from
@@ -31,7 +32,6 @@ type Atomizer interface {
 // existing registrations of the same Atom or Conductor.
 func Atomize(
 	ctx context.Context,
-	events chan interface{},
 	registrations ...interface{},
 ) (Atomizer, error) {
 	err := Register(registrations...)
@@ -39,8 +39,19 @@ func Atomize(
 		return nil, err
 	}
 
-	return (&atomizer{events: events}).init(ctx), nil
+	ctx, cancel := _ctx(ctx)
+
+	return &atomizer{
+		ctx:           ctx,
+		cancel:        cancel,
+		electrons:     make(chan instance),
+		bonded:        make(chan instance),
+		registrations: make(chan interface{}),
+		atoms:         make(map[string]chan<- instance),
+	}, nil
 }
+
+func (*atomizer) isAtomizer() {}
 
 // Exec kicks off the processing of the atomizer by pulling in the
 // pre-registrations through init calls on imported libraries and
@@ -48,7 +59,14 @@ func Atomize(
 func (a *atomizer) Exec() (err error) {
 	// Execute on the atomizer should only ever be run once
 	a.execSyncOnce.Do(func() {
-		a.event("pulling conductor and atom registrations")
+		defer a.event(func() interface{} {
+			return "pulling conductor and atom registrations"
+		})
+
+		// Initialize the registrations in the Atomizer package
+		for _, r := range Registrations() {
+			a.register(r)
+		}
 
 		// Start up the receivers
 		go a.receive()
@@ -72,7 +90,7 @@ func (a *atomizer) Register(values ...interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = &Error{
-				Event: Event{
+				Event: &Event{
 					Message: "panic in atomizer",
 				},
 				Internal: ptoe(r),
@@ -111,7 +129,7 @@ func (a *atomizer) Register(values ...interface{}) (err error) {
 }
 
 // Events creates a channel to receive events from the atomizer and
-// return the channel for logging purposes
+// return the channel for handling
 func (a *atomizer) Events(buffer int) <-chan interface{} {
 	if buffer < 0 {
 		buffer = 0
@@ -125,6 +143,23 @@ func (a *atomizer) Events(buffer int) <-chan interface{} {
 	}
 
 	return a.events
+}
+
+// Errors creates a channel to receive errors from the atomizer and
+// return the channel for handling
+func (a *atomizer) Errors(buffer int) <-chan error {
+	if buffer < 0 {
+		buffer = 0
+	}
+
+	a.errorsMu.Lock()
+	defer a.errorsMu.Unlock()
+
+	if a.errors == nil {
+		a.errors = make(chan error, buffer)
+	}
+
+	return a.errors
 }
 
 // Wait blocks on the context done channel to allow for the executable

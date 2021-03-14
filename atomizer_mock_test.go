@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"testing"
 
 	"devnw.com/alog"
 	"devnw.com/validator"
@@ -199,7 +200,7 @@ func (pt *passthrough) Send(
 
 func (pt *passthrough) Close() {}
 
-type printer struct{}
+type printer struct{ t *testing.T }
 
 type state struct{ ID string }
 
@@ -212,7 +213,7 @@ func (p *printer) Process(ctx context.Context, conductor Conductor, electron *El
 		var payload printerdata
 
 		if err = json.Unmarshal(electron.Payload, &payload); err == nil {
-			fmt.Printf("message from electron [%s] is: %s\n", electron.ID, payload.Message)
+			p.t.Logf("message from electron [%s] is: %s\n", electron.ID, payload.Message)
 		}
 	}
 
@@ -274,8 +275,9 @@ func newElectron(atomID string, payload []byte) *Electron {
 // harness creates a valid atomizer that uses the passthrough conductor
 func harness(
 	ctx context.Context,
-	events chan interface{},
-) (Conductor, error) {
+	buffer int,
+	atoms ...Atom,
+) (Conductor, <-chan interface{}, error) {
 	pass := &passthrough{
 		input: make(chan *Electron, 1),
 	}
@@ -283,31 +285,42 @@ func harness(
 	// Register the conductor so it's picked up
 	// when the atomizer is initialized
 	if err := Register(pass); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Test Atom registrations
 
 	if err := Register(&printer{}); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := Register(&noopatom{}); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := Register(&returner{}); err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	for _, a := range atoms {
+		if err := Register(a); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// Initialize the atomizer
-	mizer, err := Atomize(ctx, events)
+	mizer, err := Atomize(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error creating atomizer | %s", err)
+		return nil, nil, fmt.Errorf("error creating atomizer | %s", err)
 	}
 
 	a, _ := mizer.(*atomizer)
 
+	var events <-chan interface{}
+	if buffer >= 0 {
+		events = a.Events(buffer)
+	}
+
 	// Start the execution threads
-	return pass, a.Exec()
+	return pass, events, a.Exec()
 }

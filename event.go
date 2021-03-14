@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	gob.Register(Event{})
+	gob.Register(&Event{})
 }
 
 // Event indicates an atomizer event has taken
@@ -37,7 +37,11 @@ type Event struct {
 	ConductorID string `json:"conductorID"`
 }
 
-func (e Event) String() string {
+func (e *Event) String() string {
+	if e == nil {
+		return ""
+	}
+
 	var joins []string
 
 	ids := e.ids()
@@ -54,7 +58,7 @@ func (e Event) String() string {
 }
 
 // ids returns the electron and atom ids as a combination string
-func (e Event) ids() string {
+func (e *Event) ids() string {
 	var ids []string
 
 	// Include the conductor id if it is part of the event
@@ -77,13 +81,13 @@ func (e Event) ids() string {
 
 // makeEvent creates a base event with only a message and
 // a time
-func makeEvent(msg string) Event {
-	return Event{
+func makeEvent(msg string) *Event {
+	return &Event{
 		Message: msg,
 	}
 }
 
 // Validate determines if the event is valid
-func (e Event) Validate() bool {
+func (e *Event) Validate() bool {
 	return e.Message != ""
 }

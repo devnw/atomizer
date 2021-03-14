@@ -21,7 +21,7 @@ type wrappedErr interface {
 
 func simple(msg string, internal error) error {
 	return &Error{
-		Event: Event{
+		Event: &Event{
 			Message: msg,
 		},
 		Internal: internal,
@@ -48,7 +48,7 @@ type Error struct {
 
 	// Event is the event that took place to create
 	// the error and contains metadata relevant to the error
-	Event Event `json:"event"`
+	Event *Event `json:"event"`
 
 	// Internal is the internal error
 	Internal error `json:"internal"`

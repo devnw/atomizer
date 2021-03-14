@@ -18,7 +18,7 @@ func TestError_Error(t *testing.T) {
 		{
 			"error w/message test",
 			&Error{
-				Event: Event{
+				Event: &Event{
 					Message: "test",
 				},
 			},
@@ -27,7 +27,7 @@ func TestError_Error(t *testing.T) {
 		{
 			"error w/empty message test",
 			&Error{
-				Event: Event{},
+				Event: &Event{},
 			},
 			prefix,
 		},
@@ -35,7 +35,7 @@ func TestError_Error(t *testing.T) {
 			"error w/inner error test",
 			&Error{
 				Internal: &Error{
-					Event: Event{
+					Event: &Event{
 						Message: "test",
 					},
 				},
@@ -46,11 +46,11 @@ func TestError_Error(t *testing.T) {
 			"error w/multiple inner error test",
 			&Error{
 				Internal: &Error{
-					Event: Event{
+					Event: &Event{
 						Message: "test",
 					},
 					Internal: &Error{
-						Event: Event{
+						Event: &Event{
 							Message: "test 2",
 						},
 					},
@@ -131,7 +131,7 @@ func TestError_Validate(t *testing.T) {
 		{
 			"error w/valid event",
 			&Error{
-				Event: Event{
+				Event: &Event{
 					Message: "test",
 				},
 			},
@@ -140,7 +140,7 @@ func TestError_Validate(t *testing.T) {
 		{
 			"error w/invalid event",
 			&Error{
-				Event: Event{},
+				Event: &Event{},
 			},
 			false,
 		},

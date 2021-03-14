@@ -7,12 +7,12 @@ import (
 func TestEvent_String(t *testing.T) {
 	tests := []struct {
 		name     string
-		e        Event
+		e        *Event
 		expected string
 	}{
 		{
 			"message test",
-			Event{
+			&Event{
 				Message: "test",
 			},
 			"test",
@@ -24,7 +24,7 @@ func TestEvent_String(t *testing.T) {
 		},
 		{
 			"message w/a test",
-			Event{
+			&Event{
 				Message: "test",
 				AtomID:  "10",
 			},
@@ -32,7 +32,7 @@ func TestEvent_String(t *testing.T) {
 		},
 		{
 			"message w/c test",
-			Event{
+			&Event{
 				Message:     "test",
 				ConductorID: "10",
 			},
@@ -40,7 +40,7 @@ func TestEvent_String(t *testing.T) {
 		},
 		{
 			"message w/ea test",
-			Event{
+			&Event{
 				Message:    "test",
 				ElectronID: "10",
 				AtomID:     "11",
@@ -49,7 +49,7 @@ func TestEvent_String(t *testing.T) {
 		},
 		{
 			"message w/eac test",
-			Event{
+			&Event{
 				Message:     "test",
 				ElectronID:  "10",
 				AtomID:      "11",
@@ -59,7 +59,7 @@ func TestEvent_String(t *testing.T) {
 		},
 		{
 			"eac test",
-			Event{
+			&Event{
 				ElectronID:  "10",
 				AtomID:      "11",
 				ConductorID: "12",
