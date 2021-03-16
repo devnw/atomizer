@@ -8,33 +8,34 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
 Created to facilitate simplified construction of distributed systems, the
-Atomizer library was built with simplicity in mind by exposing an API which
-allows users to create "Atoms" ([def](docs/definitions.md#atom)) which
-contain the atomic elements of business logic for an application which when
+Atomizer library was built with simplicity in mind. Exposing a simple API which
+allows users to create "Atoms" ([def](docs/definitions.md#atom)) that
+contain the atomic elements of process logic for an application, which, when
 paired with an "Electron"([def](docs/definitions.md#electron)) payload are
-executed in the atomizer runtime.
+executed in the Atomizer runtime.
 
 ## Index
 
-* [Getting Started](#getting-started)
-* [Test App](#test-app)
-* [Atomizer Architecture](docs/design-methodologies.md)
-* [Terminology](docs/definitions.md)
-* [Conductor Creation](#conductor-creation)
-* [Atom Creation](#atom-creation)
-* [Electron Creation](#electron-creation)
-* [Properties - Atom Results](#properties---atom-results)
-* [Events](#events)
-* [Element Registration](#element-registration)
-  * [Init Registration](#init-registration)
-  * [Direct Registration](#direct-registration)
+- [Atomizer - Massively Parallel Distributed Computing](#atomizer---massively-parallel-distributed-computing)
+  - [Index](#index)
+  - [Getting Started](#getting-started)
+  - [Test App](#test-app)
+  - [Conductor Creation](#conductor-creation)
+  - [Atom Creation](#atom-creation)
+  - [Electron Creation](#electron-creation)
+  - [Properties - Atom Results](#properties---atom-results)
+  - [Events](#events)
+  - [Element Registration](#element-registration)
+    - [Init Registration](#init-registration)
+    - [Atomizer Instantiation Registration](#atomizer-instantiation-registration)
+    - [Direct Registration](#direct-registration)
 
 ## Getting Started
 
-To use Atomizer you will first need to pull a copy down.
+To use Atomizer you will first need to add it to your module.
 
 ```go
-go get -u atomizer.io/engine
+go get -u atomizer.io/engine@latest
 ```
 
 I highly recommend checking out the [Test App](#test-app) for a functional
@@ -42,8 +43,8 @@ example of the Atomizer framework in action.
 
 To create an instance of Atomizer in your app you will need a Conductor
 ([def](docs/definitions.md#conductor)). Currently there is an AMQP conductor
-that was built for the creation of Atomizer which can be found
-at ([atomizer.io/amqp](https://github.com/devnw/amqp)), or you can create
+that was built for Atomizer which can be found
+here: [AMQP](https://github.com/devnw/amqp), or you can create
 your own conductor by following the
 [Conductor creation instructions](#conductor-creation).
 
@@ -57,23 +58,13 @@ instance you can begin accepting requests. Here is an example of initializing
 the framework and registering an Atom and Conductor to begin processing.
 
 ```go
-a := Atomize(ctx, nil)
+
+// Initialize Atomizer
+a := Atomize(ctx, &MyConductor{}, &MyAtom{})
 
 // Start the Atomizer processing system
 err := a.Exec()
 
-if err != nil {
-   ...
-}
-
-// Register your Conductor
-err = a.Register(&MyConductor{})
-if err != nil {
-   ...
-}
-
-// Register your Atom
-err = a.Register(&MyAtom{})
 if err != nil {
    ...
 }
@@ -92,38 +83,28 @@ capstone team of students from the University of Illinois Springfield put
 together a test app to showcase a working implementation of the Atomizer
 framework.
 
-This Test App implements a MonteCarlo *pi* simulation using the Atomizer
-framework. The Atom implementation can be found here
-[MonteCarlo *pi*](https://github.com/devnw/montecarlopi). This implementation
+This Test App implements a MonteCarlo *π* simulation using the Atomizer
+framework. The Atom implementation can be found here:
+[MonteCarlo *π*](https://github.com/devnw/montecarlopi). This implementation
 uses two Atoms. The first Atom "MonteCarlo" is a
 [Spawner](docs/design-methodologies.md#atom-types) which creates payloads for
 the Toss Atom which is an [Atomic](docs/design-methodologies.md#atom-types)
 Atom.
 
-To run a simulation the capstone team created a Web UI built on NodeJS which
-creates the initial Electron JSON payload which is sent into a RabbitMQ AMQP
-conductor. This electron causes the MonteCarlo Atom to spawn Electron
-payloads for the Toss atom based on the number of tosses passed in through
-the UI. Once the Tosses are all complete the MonteCarlo Atom calculates the
-*pi* estimation and returns that the the original sender (i.e. the UI)
-
-[Atomizer Test WebUI](https://github.com/devnw/atomizer-test-ui)
-
-For the more technically inclined there is also now a console test
-application which can be found here.
+To run a simulation follow the steps laid out in [this blog post](https://benjiv.com/pi-day-special-2021/) which will describe how to pull down a copy of the Monte Carlo π docker containers running Atomizer.
 
 [Atomizer Test Console](https://github.com/devnw/atomizer-test-console)
 
-This test application will allow you to run the same MonteCarlo *pi*
+This test application will allow you to run the same MonteCarlo *π*
 simulation from command line without needing to setup a NodeJS app or pull
 down the corresponding Docker container.
 
 Thank you to
 
-* Matthew N Meyer ([@MatthewNormanMeyer](https://github.com/MatthewNormanMeyer))
-* Megan Pugliese ([@mugatupotamus](https://github.com/mugatupotamus))
-* Nick Heiting ([@nheiting](https://github.com/nheiting))
-* Benji Vesterby ([@benjivesterby](https://github.com/benjivesterby))
+- Matthew N Meyer ([@MatthewNormanMeyer](https://github.com/MatthewNormanMeyer))
+- Megan Pugliese ([@mugatupotamus](https://github.com/mugatupotamus))
+- Nick Heiting ([@nheiting](https://github.com/nheiting))
+- Benji Vesterby ([@benjivesterby](https://github.com/benjivesterby))
 
 ## Conductor Creation
 
@@ -138,19 +119,20 @@ type Conductor interface {
 
     // Receive gets the atoms from the source
     // that are available to atomize
-    Receive(ctx context.Context) <-chan Electron
+    Receive(ctx context.Context) <-chan *Electron
 
     // Complete mark the completion of an electron instance
     // with applicable statistics
-    Complete(ctx context.Context, properties Properties) error
+    Complete(ctx context.Context, p *Properties) error
 
     // Send sends electrons back out through the conductor for
     // additional processing
-    Send(ctx context.Context, e Electron) (<-chan Properties, error)
+    Send(ctx context.Context, electron *Electron) (<-chan *Properties, error)
 
     // Close cleans up the conductor
     Close()
 }
+
 ```
 
 Once you have created your Conductor you must then register it into the
@@ -166,7 +148,7 @@ the Atom interface seen below.
 
 ```go
 type Atom interface {
-    Process(ctx context.Context,c Conductor,e Electron,) ([]byte, error)
+    Process(ctx context.Context, c Conductor, e *Electron,) ([]byte, error)
 }
 ```
 
@@ -185,7 +167,8 @@ is pure business logic.
 // Electron is the base electron that MUST parse from the payload
 // from the conductor
 type Electron struct {
-    // SenderID is the unique identifier for the node that sent the electron
+    // SenderID is the unique identifier for the node that sent the
+    // electron
     SenderID string
 
     // ID is the unique identifier of this electron
@@ -198,9 +181,18 @@ type Electron struct {
 
     // Timeout is the maximum time duration that should be allowed
     // for this instance to process. After the duration is exceeded
-    // the context should be cancelled and the processing released
+    // the context should be canceled and the processing released
     // and a failure sent back to the conductor
     Timeout *time.Duration
+
+    // CopyState lets atomizer know if it should copy the state of the
+    // original atom registration to the new atom instance when processing
+    // a newly received electron
+    //
+    // NOTE: Copying the state of an Atom as registered requires that ALL
+    // fields that are to be copied are **EXPORTED** otherwise they are
+    // skipped
+    CopyState bool
 
     // Payload is to be used by the registered atom to properly unmarshal
     // the []byte for the actual atom instance. RawMessage is used to
@@ -210,9 +202,8 @@ type Electron struct {
 }
 ```
 
-The most important part for an Atom is the `Payload`. This `[]byte` holds
-encoded data which can be decoded in your Atom implementation. This is how
-the Atom receives state information for which it uses to process. Decoding
+The most important part for an Atom is the `Payload`. This `[]byte` holds data which can be read in your Atom. This is how
+the Atom receives state information for processing. Decoding
 the `Payload` is the responsibility of the Atom implementation. The other
 fields of the Electron are used by the Atomizer internally, but are available
 to an Atom as part of the Process method if necessary.
@@ -251,18 +242,19 @@ as it is unlikely the Atom executed.
 ## Events
 
 Atomizer exports a method called `Events` which returns a
-`<- chan interface{}`. When you call this method an internal channel in
+`<- chan interface{}` and `Errors` which returns `<-chan error`. When you call either of these methods an internal channel in
 Atomizer is created which then **MUST** be monitored for events or it will
 block processing.
 
-The purpose of this method is allow implementations to monitor the events
-occurring inside an instance of the Atomizer for informational or error events.
-These should be monitored inside a `go` routine in the client application.
+The purpose of these methods are to allow for implementations to monitor events
+occurring inside of Atomizer. Because these use channels either pass a buffer
+value to the method or handle the channel in a `go` routine to keep it from
+blocking your application.
 
-Along with this Atomizer exports two important structs. `atomizer.Error` and
-`atomizer.Event`. These contain information such as the `AtomID`,
-`ElectronID` or `ConductorID` that the event applies to as well as any
-message or error that may be part of the event.
+NOTE: These two methods create the channels which the events/errors are sent on
+when they're called so that there is minimal memory allocation in Atomizer. If you use these two methods performance will decrease.
+
+Along with the `Events` and `Errors` methods, Atomizer exports two important structs. `atomizer.Error` and `atomizer.Event`. These contain information such as the `AtomID`, `ElectronID` or `ConductorID` that the event applies to as well as any message or error that may be part of the event.
 
 Both `atomizer.Error` and `atomizer.Event` implement the `fmt.Stringer`
 interface to make for easy logging.
@@ -300,7 +292,7 @@ type Error struct {
 
     // Event is the event that took place to create
     // the error and contains metadata relevant to the error
-    Event Event `json:"event"`
+    Event *Event `json:"event"`
 
     // Internal is the internal error
     Internal error `json:"internal"`
@@ -309,16 +301,15 @@ type Error struct {
 
 ## Element Registration
 
-There are two primary elements in Atomizer that can be registered into the
-system currently. Atoms and Conductors. These two pieces are essential to
-how the Atomizer framework is able to execute processing requests. These
-elements can be registered into the Atomizer framework through two different
-methods. [Init Registration](#init-registration), and
-[Direct Registration](#direct-registration).
+There are three methods in Atomizer for registering `Atoms` and `Conductors`.
+
+- [Init Registration](#init-registration)
+- [Atomizer Instantiation Registration](#atomizer-instantiation-registration)
+- [Direct Registration](#direct-registration)
 
 ### Init Registration
 
-Atoms & Conductors can be registered in an `init` method in your code as seen
+Atoms and Conductors can be registered in an `init` method in your code as seen
 below.
 
 ```go
@@ -330,13 +321,23 @@ func init() {
 }
 ```
 
+### Atomizer Instantiation Registration
+
+Atoms and Conductors can be passed as the second argument to the `Atomize` method. This parameter is variadic and can accept *any* number of registrations.
+
+```go
+    a := Atomize(ctx, &MonteCarlo{})
+```
+
 ### Direct Registration
 
 Direct registration happens when you use the `Register` method directly on an
-Atomizer instance as seen below.
+Atomizer instance.
+
+NOTE: The `Register` call can happen before or after the `a.Exec()` method call.
 
 ```go
-a := Atomize(ctx, nil)
+a := Atomize(ctx)
 
 // Start the Atomizer processing system
 err := a.Exec()
@@ -351,4 +352,3 @@ if err != nil {
    ...
 }
 ```
-
