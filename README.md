@@ -1,6 +1,6 @@
 # Atomizer - Massively Parallel Distributed Computing
 
-[![CI](https://github.com/devnw/atomizer/workflows/CI/badge.svg)](https://github.com/devnw/atomizer/actions)
+[![CI](https://github.com/devnw/atomizer/actions/workflows/build.yml/badge.svg)](https://github.com/devnw/atomizer/actions)
 [![Go Report Card](https://goreportcard.com/badge/atomizer.io/engine)](https://goreportcard.com/report/atomizer.io/engine)
 [![codecov](https://codecov.io/gh/devnw/atomizer/branch/main/graph/badge.svg)](https://codecov.io/gh/devnw/atomizer)
 [![Go Reference](https://pkg.go.dev/badge/atomizer.io/engine.svg)](https://pkg.go.dev/atomizer.io/engine)
