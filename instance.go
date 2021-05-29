@@ -163,7 +163,6 @@ func NewTime(ctx context.Context) <-chan time.Time {
 		defer close(tchan)
 
 		for {
-
 			select {
 			case <-ctx.Done():
 				return
