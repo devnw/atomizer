@@ -9,7 +9,7 @@ import (
 	"context"
 	"fmt"
 
-	"devnw.com/validator"
+	"go.devnw.com/validator"
 )
 
 // Atomizer interface implementation

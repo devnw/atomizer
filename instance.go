@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	"devnw.com/validator"
+	"go.devnw.com/validator"
 )
 
 type instance struct {

@@ -3,8 +3,8 @@ package engine
 import (
 	"testing"
 
-	"devnw.com/validator"
 	"github.com/pkg/errors"
+	"go.devnw.com/validator"
 )
 
 func TestError_Error(t *testing.T) {

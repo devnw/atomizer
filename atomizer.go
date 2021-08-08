@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"devnw.com/validator"
 	"github.com/mohae/deepcopy"
+	"go.devnw.com/validator"
 )
 
 // atomizer facilitates the execution of tasks (aka Electrons) which

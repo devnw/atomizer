@@ -1,9 +1,9 @@
 # Atomizer - Massively Parallel Distributed Computing
 
 [![CI](https://github.com/devnw/atomizer/actions/workflows/build.yml/badge.svg)](https://github.com/devnw/atomizer/actions)
-[![Go Report Card](https://goreportcard.com/badge/atomizer.io/engine)](https://goreportcard.com/report/atomizer.io/engine)
+[![Go Report Card](https://goreportcard.com/badge/go.atomizer.io/engine)](https://goreportcard.com/report/go.atomizer.io/engine)
 [![codecov](https://codecov.io/gh/devnw/atomizer/branch/main/graph/badge.svg)](https://codecov.io/gh/devnw/atomizer)
-[![Go Reference](https://pkg.go.dev/badge/atomizer.io/engine.svg)](https://pkg.go.dev/atomizer.io/engine)
+[![Go Reference](https://pkg.go.dev/badge/go.atomizer.io/engine.svg)](https://pkg.go.dev/go.atomizer.io/engine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
@@ -35,7 +35,7 @@ executed in the Atomizer runtime.
 To use Atomizer you will first need to add it to your module.
 
 ```go
-go get -u atomizer.io/engine@latest
+go get -u go.atomizer.io/engine@latest
 ```
 
 I highly recommend checking out the [Test App](#test-app) for a functional

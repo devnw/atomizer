@@ -1,12 +1,7 @@
-devnw.com/alog v1.0.6 h1:TI4kZ4ngOXeRPBJIoXclxKA9XuR9sdRDzXHEDW5bVfM=
-devnw.com/alog v1.0.6/go.mod h1:beJR4S7HRbotF4/Syc4lbJtbCJwHcTKo9lz9J0KDBd8=
-devnw.com/validator v1.0.4 h1:pSe5CoV9gPEjWDU0c0JUilY6m2+jCma8oI9HXYP2EYw=
-devnw.com/validator v1.0.4/go.mod h1:Z9GH0cjDxgmcAvpAh74ZRkmoB9OIroKFGboNa+Q3L3g=
 github.com/Pallinder/go-randomdata v1.2.0 h1:DZ41wBchNRb/0GfsePLiSwb0PHZmT67XY00lCDlaYPg=
 github.com/Pallinder/go-randomdata v1.2.0/go.mod h1:yHmJgulpD2Nfrm0cR9tI/+oAgRqCQQixsA8HyRZfV9Y=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/google/go-cmp v0.5.4/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.6 h1:BKbKCqvP6I+rmFHt06ZmyQtvB8xAkWdhFyr0ZUNZcxQ=
 github.com/google/go-cmp v0.5.6/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
@@ -15,6 +10,11 @@ github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 h1:RWengNIwukTxcDr9
 github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826/go.mod h1:TaXosZuwdSHYgviHp1DAtfrULt5eUgsSMsZf+YrPgl8=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+go.devnw.com/alog v1.1.0 h1:rxKZUSFT2c/gQ9ZZs2KDLFePo5Fm+niqf65+sQkIuAE=
+go.devnw.com/alog v1.1.0/go.mod h1:O4v+6pLLcj2pI+yRAcdH72RZRfU3Qh6foNZIzLuZV1Q=
+go.devnw.com/validator v1.0.5/go.mod h1:5kfqytQCBGTupXx1ZoIfV97qvKtsAi6lt2HfmvjWa6A=
+go.devnw.com/validator v1.0.6 h1:ssxnMavMcSSDpAGlhmmfMYM90UBCkFEHDE1SanzThHg=
+go.devnw.com/validator v1.0.6/go.mod h1:5kfqytQCBGTupXx1ZoIfV97qvKtsAi6lt2HfmvjWa6A=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
 golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
 golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=

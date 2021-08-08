@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"devnw.com/validator"
 	"github.com/google/go-cmp/cmp"
+	"go.devnw.com/validator"
 )
 
 var pay = `{"test":"test"}`

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"devnw.com/validator"
 	"github.com/Pallinder/go-randomdata"
 	"github.com/google/uuid"
+	"go.devnw.com/validator"
 )
 
 func printEvents(

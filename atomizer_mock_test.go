@@ -7,11 +7,11 @@ import (
 	"sync"
 	"testing"
 
-	"devnw.com/alog"
-	"devnw.com/validator"
 	"github.com/Pallinder/go-randomdata"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"go.devnw.com/alog"
+	"go.devnw.com/validator"
 )
 
 type tresult struct {

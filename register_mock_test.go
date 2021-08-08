@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"devnw.com/alog"
+	"go.devnw.com/alog"
 )
 
 func reset(ctx context.Context, t *testing.T) {
