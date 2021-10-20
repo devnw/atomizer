@@ -19,7 +19,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16.x
+          go-version: 1.17.x
       - name: Build
         run: go build ./...
       - name: Test
@@ -29,7 +29,7 @@ jobs:
     needs: [build]
     strategy:
       matrix:
-        go-version: [1.16.x]
+        go-version: [1.17.x]
         platform: [ubuntu-latest, macos-latest, windows-latest]
       fail-fast: true
     runs-on: ${{ matrix.platform }}
