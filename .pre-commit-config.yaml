@@ -1,0 +1,13 @@
+repos:
+-   repo: https://github.com/Contrast-Labs/detect-secrets
+    rev: v1.1.2
+    hooks:
+    -   id: detect-secrets
+        name: Detect secrets
+        language: python
+        entry: detect-secrets-hook
+        args: ['--baseline', '.secrets.baseline']
+-   repo: https://github.com/golangci/golangci-lint
+    rev: v1.42.1
+    hooks:
+    -   id: golangci-lint
