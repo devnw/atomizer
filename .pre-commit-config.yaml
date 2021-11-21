@@ -8,6 +8,18 @@ repos:
         entry: detect-secrets-hook
         args: ['--baseline', '.secrets.baseline']
 -   repo: https://github.com/golangci/golangci-lint
-    rev: v1.42.1
+    rev: v1.43.0
     hooks:
     -   id: golangci-lint
+-   repo: git://github.com/Bahjat/pre-commit-golang    
+    rev: c3086eea8af86847dbdff2e46b85a5fe3c9d9656 # pragma: allowlist secret
+    hooks:
+      - id: go-unit-tests
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+    -   id: check-json
+    -   id: check-added-large-files
+    -   id: pretty-format-json
+    -   id: check-merge-conflict
+    -   id: check-yaml
