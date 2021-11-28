@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.devnw.com/alog"
+	"go.devnw.com/event"
 	"go.devnw.com/validator"
 )
 
@@ -247,7 +248,7 @@ func spawnReturner(size int) (tests []*tresult) {
 
 		e := newElectron(
 			ID(returner{}),
-			[]byte(fmt.Sprintf("{\"message\":\"%s\"}", msg)),
+			[]byte(fmt.Sprintf("{\"message\":%q}", msg)),
 		)
 
 		tests = append(tests, &tresult{
@@ -277,7 +278,7 @@ func harness(
 	ctx context.Context,
 	buffer int,
 	atoms ...Atom,
-) (Conductor, <-chan interface{}, error) {
+) (Conductor, event.EventStream, error) {
 	pass := &passthrough{
 		input: make(chan *Electron, 1),
 	}
@@ -316,9 +317,9 @@ func harness(
 
 	a, _ := mizer.(*atomizer)
 
-	var events <-chan interface{}
+	var events event.EventStream
 	if buffer >= 0 {
-		events = a.Events(buffer)
+		events = a.Publisher().ReadEvents(buffer)
 	}
 
 	// Start the execution threads

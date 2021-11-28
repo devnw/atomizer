@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mohae/deepcopy"
+	"go.devnw.com/event"
 	"go.devnw.com/validator"
 )
 
@@ -40,11 +41,7 @@ type atomizer struct {
 	atomsMu sync.RWMutex
 	atoms   map[string]chan<- instance
 
-	eventsMu sync.RWMutex
-	events   chan interface{}
-
-	errorsMu sync.RWMutex
-	errors   chan error
+	publisher *event.Publisher
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -52,39 +49,12 @@ type atomizer struct {
 	execSyncOnce sync.Once
 }
 
-type eventFunc func() interface{}
-type errFunc func() error
-
-// event is a helper function that indicates
-// if the events channel is nil
-func (a *atomizer) event(fn eventFunc) {
-	if a.events != nil {
-		select {
-		case <-a.ctx.Done():
-			return
-		case a.events <- fn():
-		}
-	}
-}
-
-// e is a helper function that indicates
-// if the events channel is nil
-func (a *atomizer) err(fn errFunc) {
-	if a.errors != nil {
-		select {
-		case <-a.ctx.Done():
-			return
-		case a.errors <- fn():
-		}
-	}
-}
-
 // Initialize the go routines that will read from the conductors concurrently
 // while other parts of the atomizer reads in the inputs and executes the
 // instances of electrons
 func (a *atomizer) receive() {
 	if a.registrations == nil {
-		a.err(func() error {
+		a.publisher.ErrorFunc(a.ctx, func() error {
 			return &Error{
 				Event: &Event{
 					Message: "nil registrations channel",
@@ -101,14 +71,14 @@ func (a *atomizer) receive() {
 			return
 		case r, ok := <-a.registrations:
 			if !ok {
-				a.err(func() error {
+				a.publisher.ErrorFunc(a.ctx, func() error {
 					return simple("registrations closed", nil)
 				})
 				return
 			}
 
 			a.register(r)
-			a.event(func() interface{} {
+			a.publisher.EventFunc(a.ctx, func() event.Event {
 				return makeEvent("registered " + ID(r))
 			})
 		}
@@ -119,7 +89,7 @@ func (a *atomizer) receive() {
 // wherever they were sent from
 func (a *atomizer) register(input interface{}) {
 	if !validator.Valid(input) {
-		a.err(func() error {
+		a.publisher.ErrorFunc(a.ctx, func() error {
 			return simple("invalid registration "+ID(input), nil)
 		})
 	}
@@ -128,7 +98,7 @@ func (a *atomizer) register(input interface{}) {
 	case Conductor:
 		err := a.receiveConductor(v)
 		if err == nil {
-			a.event(func() interface{} {
+			a.publisher.EventFunc(a.ctx, func() event.Event {
 				return &Event{
 					Message:     "conductor received",
 					ConductorID: ID(v),
@@ -139,7 +109,7 @@ func (a *atomizer) register(input interface{}) {
 
 		err := a.receiveAtom(v)
 		if err == nil {
-			a.event(func() interface{} {
+			a.publisher.EventFunc(a.ctx, func() event.Event {
 				return &Event{
 					Message: "atom received",
 					AtomID:  ID(v),
@@ -147,7 +117,7 @@ func (a *atomizer) register(input interface{}) {
 			})
 		}
 	default:
-		a.err(func() error {
+		a.publisher.ErrorFunc(a.ctx, func() error {
 			return simple(
 				"unknown registration type "+ID(input),
 				nil,
@@ -177,7 +147,7 @@ func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
 	// the atomizer to re-initialize so this stack can be
 	// garbage collected
 
-	// 	a.event(a.Register(conductor))
+	// 	a.publisher.EventFunc(a.ctx, a.Register(conductor))
 	// }))
 
 	receiver := conductor.Receive(ctx)
@@ -190,7 +160,7 @@ func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
 			return
 		case e, ok := <-receiver:
 			if !ok {
-				a.err(func() error {
+				a.publisher.ErrorFunc(a.ctx, func() error {
 					return &Error{Event: &Event{
 						Message:     "receiver closed",
 						ConductorID: ID(conductor),
@@ -219,14 +189,14 @@ func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
 					},
 				)
 
-				a.err(func() error {
+				a.publisher.ErrorFunc(a.ctx, func() error {
 					return err
 				})
 
 				continue
 			}
 
-			a.event(func() interface{} {
+			a.publisher.EventFunc(a.ctx, func() event.Event {
 				return &Event{
 					Message:     "electron received",
 					ElectronID:  e.ID,
@@ -244,7 +214,7 @@ func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
 				electron:  e,
 				conductor: conductor,
 			}:
-				a.event(func() interface{} {
+				a.publisher.EventFunc(a.ctx, func() event.Event {
 					return &Event{
 						Message:     "electron distributed",
 						ElectronID:  e.ID,
@@ -273,7 +243,7 @@ func (a *atomizer) receiveAtom(atom Atom) error {
 	defer a.atomsMu.Unlock()
 
 	a.atoms[ID(atom)] = a.split(atom)
-	a.event(func() interface{} {
+	a.publisher.EventFunc(a.ctx, func() event.Event {
 		return &Event{
 			Message: "registered electron channel",
 			AtomID:  ID(atom),
@@ -303,7 +273,7 @@ func (a *atomizer) _split(
 			return
 		case inst, ok := <-electrons:
 			if !ok {
-				a.err(func() error {
+				a.publisher.ErrorFunc(a.ctx, func() error {
 					return &Error{
 						Event: &Event{
 							Message: "atom receiver closed",
@@ -314,7 +284,7 @@ func (a *atomizer) _split(
 				return
 			}
 
-			a.event(func() interface{} {
+			a.publisher.EventFunc(a.ctx, func() event.Event {
 				return &Event{
 					Message:     "new instance of electron",
 					ElectronID:  inst.electron.ID,
@@ -356,7 +326,7 @@ func (a *atomizer) _split(
 func (a *atomizer) exec(inst instance, atom Atom) {
 	// bond the new atom instantiation to the electron instance
 	if err := inst.bond(atom); err != nil {
-		a.err(func() error {
+		a.publisher.ErrorFunc(a.ctx, func() error {
 			return &Error{
 				Event: &Event{
 					Message:     "error while bonding",
@@ -373,7 +343,7 @@ func (a *atomizer) exec(inst instance, atom Atom) {
 	// picked up for monitoring
 	err := inst.execute(a.ctx)
 	if err != nil {
-		defer a.err(func() error {
+		defer a.publisher.ErrorFunc(a.ctx, func() error {
 			return &Error{
 				Internal: inst.properties.Error,
 				Event: &Event{
@@ -400,7 +370,7 @@ func (a *atomizer) exec(inst instance, atom Atom) {
 
 		if inst.conductor != nil {
 			completion := inst.conductor.Complete(a.ctx, inst.properties)
-			a.err(func() error {
+			a.publisher.ErrorFunc(a.ctx, func() error {
 				return completion
 			})
 		}
@@ -414,7 +384,7 @@ func (a *atomizer) distribute() {
 			return
 		case inst, ok := <-a.electrons:
 			if !ok {
-				a.err(func() error {
+				a.publisher.ErrorFunc(a.ctx, func() error {
 					return &Error{
 						Event: &Event{
 							Message: "dist channel closed",
@@ -434,7 +404,7 @@ func (a *atomizer) distribute() {
 				// since the atom doesn't exist in
 				// the registry
 
-				a.err(func() error {
+				a.publisher.ErrorFunc(a.ctx, func() error {
 					return &Error{
 						Event: &Event{
 							Message:    "not registered",
@@ -446,7 +416,7 @@ func (a *atomizer) distribute() {
 				continue
 			}
 
-			a.event(func() interface{} {
+			a.publisher.EventFunc(a.ctx, func() event.Event {
 				return &Event{
 					Message:     "pushing electron to atom",
 					ElectronID:  inst.electron.ID,
@@ -459,7 +429,7 @@ func (a *atomizer) distribute() {
 			case <-a.ctx.Done():
 				return
 			case achan <- inst:
-				a.event(func() interface{} {
+				a.publisher.EventFunc(a.ctx, func() event.Event {
 					return &Event{
 						Message:     "pushed electron to atom",
 						ElectronID:  inst.electron.ID,
