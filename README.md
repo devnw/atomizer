@@ -91,7 +91,9 @@ uses two Atoms. The first Atom "MonteCarlo" is a
 the Toss Atom which is an [Atomic](docs/design-methodologies.md#atom-types)
 Atom.
 
-To run a simulation follow the steps laid out in [this blog post](https://benjiv.com/pi-day-special-2021/) which will describe how to pull down a copy of the Monte Carlo π docker containers running Atomizer.
+To run a simulation follow the steps laid out in [this blog post](https://benjiv.com/pi-day-special-2021/)
+which will describe how to pull down a copy of the Monte Carlo π docker
+containers running Atomizer.
 
 [Atomizer Test Console](https://github.com/devnw/atomizer-test-console)
 
@@ -202,11 +204,12 @@ type Electron struct {
 }
 ```
 
-The most important part for an Atom is the `Payload`. This `[]byte` holds data which can be read in your Atom. This is how
-the Atom receives state information for processing. Decoding
-the `Payload` is the responsibility of the Atom implementation. The other
-fields of the Electron are used by the Atomizer internally, but are available
-to an Atom as part of the Process method if necessary.
+The most important part for an Atom is the `Payload`. This `[]byte` holds data
+which can be read in your Atom. This is how the Atom receives state information
+for processing. Decoding the `Payload` is the responsibility of the Atom
+implementation. The other fields of the Electron are used by the Atomizer
+internally, but are available to an Atom as part of the Process method if
+necessary.
 
 Electrons are provided to the Atomizer framework through a registered
 Conductor, generally a Message Queue.
@@ -241,9 +244,11 @@ as it is unlikely the Atom executed.
 
 ## Events
 
-Atomizer exports a method called `Events` which returns a
-`<- chan interface{}` and `Errors` which returns `<-chan error`. When you call either of these methods an internal channel in
-Atomizer is created which then **MUST** be monitored for events or it will
+Atomizer exports a method called `Events` which returns an
+`go.devnw.com/events.EventStream` and `Errors` which returns an
+`go.devnw.com/events.ErrorStream`. When you call either of
+these methods utilize an internal channel within the `go.devnw.com/event`
+package which then **MUST** be monitored for events/errors or it will
 block processing.
 
 The purpose of these methods are to allow for implementations to monitor events
@@ -251,16 +256,19 @@ occurring inside of Atomizer. Because these use channels either pass a buffer
 value to the method or handle the channel in a `go` routine to keep it from
 blocking your application.
 
-NOTE: These two methods create the channels which the events/errors are sent on
-when they're called so that there is minimal memory allocation in Atomizer. If you use these two methods performance will decrease.
-
-Along with the `Events` and `Errors` methods, Atomizer exports two important structs. `atomizer.Error` and `atomizer.Event`. These contain information such as the `AtomID`, `ElectronID` or `ConductorID` that the event applies to as well as any message or error that may be part of the event.
+Along with the `Events` and `Errors` methods, Atomizer exports two important
+structs. `atomizer.Error` and `atomizer.Event`. These contain information such
+as the `AtomID`, `ElectronID` or `ConductorID` that the event applies to as well
+as any message or error that may be part of the event.
 
 Both `atomizer.Error` and `atomizer.Event` implement the `fmt.Stringer`
 interface to make for easy logging.
 
 `atomizer.Error` also implements the `error` interface as well as the
 `Unwrap` method for nested errors.
+
+`atomizer.Event` also implements the `go.devnw.com/events.Event` interface to
+ensure the the `event` package can correctly handle the event.
 
 ```go
 // Event indicates an atomizer event has taken
@@ -323,7 +331,8 @@ func init() {
 
 ### Atomizer Instantiation Registration
 
-Atoms and Conductors can be passed as the second argument to the `Atomize` method. This parameter is variadic and can accept *any* number of registrations.
+Atoms and Conductors can be passed as the second argument to the `Atomize`
+method. This parameter is variadic and can accept *any* number of registrations.
 
 ```go
     a := Atomize(ctx, &MonteCarlo{})
