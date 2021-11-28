@@ -37,6 +37,10 @@ type Event struct {
 	ConductorID string `json:"conductorID"`
 }
 
+func (e *Event) Event() string {
+	return e.String()
+}
+
 func (e *Event) String() string {
 	if e == nil {
 		return ""

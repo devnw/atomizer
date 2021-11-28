@@ -6,6 +6,7 @@
 package engine
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"time"
@@ -111,6 +112,6 @@ func (p *Properties) Equal(p2 *Properties) bool {
 		p.AtomID == p2.AtomID &&
 		p.Start.Equal(p2.Start) &&
 		p.End.Equal(p2.End) &&
-		string(p.Result) == string(p2.Result) &&
+		bytes.Equal(p.Result, p2.Result) &&
 		eEquals
 }

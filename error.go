@@ -63,7 +63,7 @@ func (e *Error) String() string {
 
 	fields = append(fields, "atomizer error")
 
-	msg := e.Event.String()
+	msg := e.Event.Event()
 	if msg != "" {
 		fields = append(fields, msg)
 	}

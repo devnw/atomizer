@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 
+	"go.devnw.com/event"
 	"go.devnw.com/validator"
 )
 
@@ -16,9 +17,8 @@ import (
 type Atomizer interface {
 	Exec() error
 	Register(value ...interface{}) error
-	Events(buffer int) <-chan interface{}
-	Errors(buffer int) <-chan error
 	Wait()
+	Publisher() *event.Publisher
 
 	// private methods enforce only this
 	// package can return an atomizer
@@ -48,10 +48,14 @@ func Atomize(
 		bonded:        make(chan instance),
 		registrations: make(chan interface{}),
 		atoms:         make(map[string]chan<- instance),
+		publisher:     event.NewPublisher(ctx),
 	}, nil
 }
 
 func (*atomizer) isAtomizer() {}
+
+// Publisher returns the atomizer's event publisher
+func (a *atomizer) Publisher() *event.Publisher { return a.publisher }
 
 // Exec kicks off the processing of the atomizer by pulling in the
 // pre-registrations through init calls on imported libraries and
@@ -59,8 +63,8 @@ func (*atomizer) isAtomizer() {}
 func (a *atomizer) Exec() (err error) {
 	// Execute on the atomizer should only ever be run once
 	a.execSyncOnce.Do(func() {
-		defer a.event(func() interface{} {
-			return "pulling conductor and atom registrations"
+		defer a.publisher.EventFunc(a.ctx, func() event.Event {
+			return makeEvent("pulling conductor and atom registrations")
 		})
 
 		// Initialize the registrations in the Atomizer package
@@ -126,40 +130,6 @@ func (a *atomizer) Register(values ...interface{}) (err error) {
 	}
 
 	return err
-}
-
-// Events creates a channel to receive events from the atomizer and
-// return the channel for handling
-func (a *atomizer) Events(buffer int) <-chan interface{} {
-	if buffer < 0 {
-		buffer = 0
-	}
-
-	a.eventsMu.Lock()
-	defer a.eventsMu.Unlock()
-
-	if a.events == nil {
-		a.events = make(chan interface{}, buffer)
-	}
-
-	return a.events
-}
-
-// Errors creates a channel to receive errors from the atomizer and
-// return the channel for handling
-func (a *atomizer) Errors(buffer int) <-chan error {
-	if buffer < 0 {
-		buffer = 0
-	}
-
-	a.errorsMu.Lock()
-	defer a.errorsMu.Unlock()
-
-	if a.errors == nil {
-		a.errors = make(chan error, buffer)
-	}
-
-	return a.errors
 }
 
 // Wait blocks on the context done channel to allow for the executable

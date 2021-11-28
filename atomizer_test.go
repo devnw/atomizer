@@ -9,13 +9,14 @@ import (
 
 	"github.com/Pallinder/go-randomdata"
 	"github.com/google/uuid"
+	"go.devnw.com/event"
 	"go.devnw.com/validator"
 )
 
 func printEvents(
 	ctx context.Context,
 	t *testing.T,
-	events <-chan interface{},
+	events event.EventStream,
 ) {
 	for {
 		select {
@@ -69,7 +70,7 @@ func TestAtomizer_Exec(t *testing.T) {
 	e := newElectron(
 		ID(returner{}),
 		[]byte(
-			fmt.Sprintf("{\"message\":\"%s\"}", msg),
+			fmt.Sprintf("{\"message\":%q}", msg),
 		),
 	)
 
@@ -160,7 +161,7 @@ func TestAtomizer_initReg_Exec(t *testing.T) {
 	e := newElectron(
 		ID(returner{}),
 		[]byte(
-			fmt.Sprintf("{\"message\":\"%s\"}", msg),
+			fmt.Sprintf("{\"message\":%q}", msg),
 		),
 	)
 
@@ -563,19 +564,25 @@ func TestAtomizer_register_Errs(t *testing.T) {
 	}{
 		{
 			"invalid conductor test",
-			&atomizer{ctx: ctx},
+			&atomizer{
+				ctx:       ctx,
+				publisher: event.NewPublisher(ctx),
+			},
 			&validconductor{},
 		},
 		{
 			"Invalid Struct Type",
-			&atomizer{ctx: ctx},
+			&atomizer{
+				ctx:       ctx,
+				publisher: event.NewPublisher(ctx),
+			},
 			&struct{}{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.key, func(t *testing.T) {
-			errors := test.a.Errors(1)
+			errors := test.a.Publisher().ReadErrors(1)
 
 			test.a.register(test.value)
 
@@ -600,17 +607,17 @@ func TestAtomizer_Register_Errs(t *testing.T) {
 	}{
 		{
 			"panic test, nil channels",
-			&atomizer{},
+			&atomizer{publisher: event.NewPublisher(ctx)},
 			&validconductor{make(chan *Electron), true},
 		},
 		{
 			"close context test",
-			&atomizer{ctx: ctx},
+			&atomizer{ctx: ctx, publisher: event.NewPublisher(ctx)},
 			&validconductor{make(chan *Electron), true},
 		},
 		{
 			"Invalid Struct Type",
-			&atomizer{},
+			&atomizer{publisher: event.NewPublisher(ctx)},
 			&struct{}{},
 		},
 	}
@@ -626,172 +633,36 @@ func TestAtomizer_Register_Errs(t *testing.T) {
 	}
 }
 
-// Tests the proper functionality of event passing over the atomizer channel
-func TestAtomizer_Events(t *testing.T) {
-	_, _, a := unexpHarness(t)
-
-	events := a.Events(1)
-	in := &Event{Message: "hello kitty"}
-
-	a.event(func() interface{} { return in })
-
-	out, ok := <-events
-	if !ok {
-		t.Fatal("channel closed")
-	}
-
-	if in != out {
-		t.Fatal("events do not match")
-	}
-}
-
-// Tests the proper functionality of event passing over the atomizer channel
-func TestAtomizer_Events_NegBuff(t *testing.T) {
-	_, _, a := unexpHarness(t)
-
-	events := a.Events(-1)
-	in := &Event{Message: "hello kitty"}
-
-	go a.event(func() interface{} { return in })
-
-	out, ok := <-events
-	if !ok {
-		t.Fatal("channel closed")
-	}
-
-	if in != out {
-		t.Fatal("events do not match")
-	}
-}
-
-func TestAtomizer_event(t *testing.T) {
-	_, _, a := unexpHarness(t)
-
-	out := a.Events(0)
-	in := &Event{Message: "hello kitty"}
-
-	go a.event(func() interface{} { return in })
-	<-out
-}
-
-func TestAtomizer_event_panic(t *testing.T) {
-	a := &atomizer{}
-
-	events := a.Events(1)
-
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("expected panic")
-		}
-	}()
-
-	a.event(func() interface{} { return &Event{Message: "hello kitty"} })
-
-	_, ok := <-events
-	if !ok {
-		t.Fatal("channel closed")
-	}
-
-	t.Fatal("shouldn't have been able to get here")
-}
-
-// Tests the proper functionality of event passing over the atomizer channel
-func TestAtomizer_Errors(t *testing.T) {
-	_, _, a := unexpHarness(t)
-
-	errors := a.Errors(1)
-	in := &Error{Event: &Event{Message: "hello kitty"}}
-
-	a.err(func() error { return in })
-
-	out, ok := <-errors
-	if !ok {
-		t.Fatal("channel closed")
-	}
-
-	if in != out {
-		t.Fatal("events do not match")
-	}
-}
-
-// Tests the proper functionality of event passing over the atomizer channel
-func TestAtomizer_Errors_NegBuff(t *testing.T) {
-	_, _, a := unexpHarness(t)
-
-	errors := a.Errors(-1)
-	in := &Error{Event: &Event{Message: "hello kitty"}}
-
-	go a.err(func() error { return in })
-
-	out, ok := <-errors
-	if !ok {
-		t.Fatal("channel closed")
-	}
-
-	if in != out {
-		t.Fatal("events do not match")
-	}
-}
-
-func TestAtomizer_err(t *testing.T) {
-	_, _, a := unexpHarness(t)
-
-	out := a.Errors(0)
-	in := &Error{Event: &Event{Message: "hello kitty"}}
-
-	go a.err(func() error { return in })
-	<-out
-}
-
-func TestAtomizer_error_panic(t *testing.T) {
-	a := &atomizer{}
-
-	errors := a.Errors(1)
-
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("expected panic")
-		}
-	}()
-
-	a.err(func() error { return &Error{Event: &Event{Message: "hello kitty"}} })
-
-	_, ok := <-errors
-	if !ok {
-		t.Fatal("channel closed")
-	}
-
-	t.Fatal("shouldn't have been able to get here")
-}
-
 func TestAtomizer_receive_panic(t *testing.T) {
-	a := &atomizer{}
+	a := &atomizer{
+		ctx:       context.Background(),
+		publisher: event.NewPublisher(context.Background()),
+	}
 
-	errors := a.Errors(1)
+	errors := a.Publisher().ReadErrors(1)
 
 	defer func() {
 		r := recover()
-		if r == nil {
-			t.Fatal("expected panic")
+		if r != nil {
+			t.Fatal("unexpected panic")
 		}
 	}()
 
 	a.receive()
 
-	_, ok := <-errors
-	if !ok {
+	err, ok := <-errors
+	if !ok || err == nil {
 		t.Fatal("channel closed")
 	}
-
-	t.Fatal("shouldn't have been able to get here")
 }
 
 func TestAtomizer_receive_nilreg(t *testing.T) {
-	a := &atomizer{ctx: context.Background()}
+	a := &atomizer{
+		ctx:       context.Background(),
+		publisher: event.NewPublisher(context.Background()),
+	}
 
-	errors := a.Errors(1)
+	errors := a.Publisher().ReadErrors(1)
 
 	a.receive()
 
@@ -805,11 +676,12 @@ func TestAtomizer_receive_closedReg(t *testing.T) {
 	a := &atomizer{
 		ctx:           context.Background(),
 		registrations: make(chan interface{}),
+		publisher:     event.NewPublisher(context.Background()),
 	}
 
 	close(a.registrations)
 
-	errors := a.Errors(1)
+	errors := a.Publisher().ReadErrors(1)
 
 	a.receive()
 
@@ -820,7 +692,7 @@ func TestAtomizer_receive_closedReg(t *testing.T) {
 }
 
 func TestAtomizer_receiveAtom_invalid(t *testing.T) {
-	a := &atomizer{}
+	a := &atomizer{publisher: event.NewPublisher(context.Background())}
 
 	err := a.receiveAtom(&invalidatom{})
 	if err == nil {
@@ -832,9 +704,12 @@ func TestAtomizer_conduct_closedreceiver(t *testing.T) {
 	c := &validconductor{echan: make(chan *Electron)}
 	close(c.echan)
 
-	a := &atomizer{ctx: context.Background()}
+	a := &atomizer{
+		ctx:       context.Background(),
+		publisher: event.NewPublisher(context.Background()),
+	}
 
-	errors := a.Errors(1)
+	errors := a.Publisher().ReadErrors(1)
 
 	a.conduct(context.Background(), c)
 
@@ -848,30 +723,31 @@ func TestAtomizer_conduct_panic(t *testing.T) {
 	c := &validconductor{echan: make(chan *Electron)}
 	close(c.echan)
 
-	a := &atomizer{}
+	a := &atomizer{publisher: event.NewPublisher(context.Background())}
 
-	errors := a.Errors(2)
+	errors := a.Publisher().ReadErrors(2)
 
 	defer func() {
 		r := recover()
-		if r == nil {
-			t.Fatal("expected panic")
+		if r != nil {
+			t.Fatal("unexpected panic")
 		}
 	}()
 
 	a.conduct(context.Background(), c)
 
-	_, ok := <-errors
-	if !ok {
-		t.Fatal("channel closed")
+	err, ok := <-errors
+	if !ok || err == nil {
+		t.Fatal("expected error")
 	}
-
-	t.Fatal("expected panic")
 }
 
 func TestAtomizer_conduct_invalidE(t *testing.T) {
 	c := &passthrough{input: make(chan *Electron)}
-	a := &atomizer{ctx: context.Background()}
+	a := &atomizer{
+		ctx:       context.Background(),
+		publisher: event.NewPublisher(context.Background()),
+	}
 	go a.conduct(context.Background(), c)
 
 	t.Log("sending")
@@ -893,10 +769,12 @@ func TestAtomizer_conduct_invalidE(t *testing.T) {
 
 func TestAtomizer_split_closedEchan(t *testing.T) {
 	a := &atomizer{
-		ctx: context.Background(),
+		ctx:       context.Background(),
+		publisher: event.NewPublisher(context.Background()),
 	}
 
-	errors := a.Errors(1)
+	errors := a.Publisher().ReadErrors(1)
+
 	echan := make(chan instance)
 	close(echan)
 
@@ -911,8 +789,9 @@ func TestAtomizer_split_closedEchan(t *testing.T) {
 func TestAtomizer_Wait(t *testing.T) {
 	ctx, cancel := _ctx(context.TODO())
 	a := &atomizer{
-		ctx:    ctx,
-		cancel: cancel,
+		ctx:       ctx,
+		cancel:    cancel,
+		publisher: event.NewPublisher(ctx),
 	}
 
 	cancel()
@@ -925,10 +804,11 @@ func TestAtomizer_distribute_closedEchan(t *testing.T) {
 		ctx:       ctx,
 		cancel:    cancel,
 		electrons: make(chan instance),
+		publisher: event.NewPublisher(ctx),
 	}
 	close(a.electrons)
 
-	errors := a.Errors(1)
+	errors := a.Publisher().ReadErrors(1)
 
 	a.distribute()
 
@@ -941,11 +821,13 @@ func TestAtomizer_distribute_closedEchan(t *testing.T) {
 func TestAtomizer_exec_ERR(t *testing.T) {
 	ctx, cancel := _ctx(context.TODO())
 	a := &atomizer{
-		ctx:    ctx,
-		cancel: cancel,
+		ctx:       ctx,
+		cancel:    cancel,
+		publisher: event.NewPublisher(ctx),
 	}
 
-	errors := a.Errors(1)
+	errors := a.Publisher().ReadErrors(1)
+
 	i := instance{ctx: ctx, cancel: cancel}
 
 	a.exec(i, nil)
@@ -974,7 +856,8 @@ func unexpHarness(t *testing.T) (context.Context, context.CancelFunc, *atomizer)
 func TestAtomizer_distribute_unregistered(t *testing.T) {
 	ctx, cancel, a := unexpHarness(t)
 
-	errors := a.Errors(1)
+	errors := a.Publisher().ReadErrors(1)
+
 	i := instance{
 		ctx:      ctx,
 		cancel:   cancel,
@@ -993,7 +876,8 @@ func TestAtomizer_distribute_unregistered(t *testing.T) {
 func TestAtomizer_exec_inst_err(t *testing.T) {
 	ctx, cancel, a := unexpHarness(t)
 
-	errors := a.Errors(1)
+	errors := a.Publisher().ReadErrors(1)
+
 	i := instance{
 		ctx:       ctx,
 		cancel:    cancel,
@@ -1025,6 +909,7 @@ func TestAtomizer_Validate(t *testing.T) {
 				cancel: context.CancelFunc(func() {
 
 				}),
+				publisher: event.NewPublisher(context.Background()),
 			},
 			false,
 		},

@@ -85,7 +85,7 @@ func TestElectron_UnmarshalJSON(t *testing.T) {
 		{
 			"valid electron / base64 payload",
 			nonb64,
-			fmt.Sprintf(`{"senderid":"empty","id":"empty","atomid":"empty","payload":"%s"}`, pay64Encoded),
+			fmt.Sprintf(`{"senderid":"empty","id":"empty","atomid":"empty","payload":%q}`, pay64Encoded),
 			false,
 		},
 		{
