@@ -247,11 +247,11 @@ as it is unlikely the Atom executed.
 Atomizer exports a method called `Events` which returns an
 `go.devnw.com/events.EventStream` and `Errors` which returns an
 `go.devnw.com/events.ErrorStream`. When you call either of
-these methods utilize an internal channel within the `go.devnw.com/event`
-package which then **MUST** be monitored for events/errors or it will
-block processing.
+these methods with a buffer of 0 they utilize an internal channel within the
+`go.devnw.com/event` package which then **MUST** be monitored for events/errors
+or it will block processing.
 
-The purpose of these methods are to allow for implementations to monitor events
+The purpose of these methods is to allow for users to monitor events
 occurring inside of Atomizer. Because these use channels either pass a buffer
 value to the method or handle the channel in a `go` routine to keep it from
 blocking your application.
