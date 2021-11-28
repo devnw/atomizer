@@ -582,7 +582,7 @@ func TestAtomizer_register_Errs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.key, func(t *testing.T) {
-			errors := test.a.Publisher().ReadErrors(1)
+			errors := test.a.Errors(1)
 
 			test.a.register(test.value)
 
@@ -639,7 +639,7 @@ func TestAtomizer_receive_panic(t *testing.T) {
 		publisher: event.NewPublisher(context.Background()),
 	}
 
-	errors := a.Publisher().ReadErrors(1)
+	errors := a.Errors(1)
 
 	defer func() {
 		r := recover()
@@ -662,7 +662,7 @@ func TestAtomizer_receive_nilreg(t *testing.T) {
 		publisher: event.NewPublisher(context.Background()),
 	}
 
-	errors := a.Publisher().ReadErrors(1)
+	errors := a.Errors(1)
 
 	a.receive()
 
@@ -681,7 +681,7 @@ func TestAtomizer_receive_closedReg(t *testing.T) {
 
 	close(a.registrations)
 
-	errors := a.Publisher().ReadErrors(1)
+	errors := a.Errors(1)
 
 	a.receive()
 
@@ -709,7 +709,7 @@ func TestAtomizer_conduct_closedreceiver(t *testing.T) {
 		publisher: event.NewPublisher(context.Background()),
 	}
 
-	errors := a.Publisher().ReadErrors(1)
+	errors := a.Errors(1)
 
 	a.conduct(context.Background(), c)
 
@@ -725,7 +725,7 @@ func TestAtomizer_conduct_panic(t *testing.T) {
 
 	a := &atomizer{publisher: event.NewPublisher(context.Background())}
 
-	errors := a.Publisher().ReadErrors(2)
+	errors := a.Errors(2)
 
 	defer func() {
 		r := recover()
@@ -773,7 +773,7 @@ func TestAtomizer_split_closedEchan(t *testing.T) {
 		publisher: event.NewPublisher(context.Background()),
 	}
 
-	errors := a.Publisher().ReadErrors(1)
+	errors := a.Errors(1)
 
 	echan := make(chan instance)
 	close(echan)
@@ -808,7 +808,7 @@ func TestAtomizer_distribute_closedEchan(t *testing.T) {
 	}
 	close(a.electrons)
 
-	errors := a.Publisher().ReadErrors(1)
+	errors := a.Errors(1)
 
 	a.distribute()
 
@@ -826,7 +826,7 @@ func TestAtomizer_exec_ERR(t *testing.T) {
 		publisher: event.NewPublisher(ctx),
 	}
 
-	errors := a.Publisher().ReadErrors(1)
+	errors := a.Errors(1)
 
 	i := instance{ctx: ctx, cancel: cancel}
 
@@ -856,7 +856,7 @@ func unexpHarness(t *testing.T) (context.Context, context.CancelFunc, *atomizer)
 func TestAtomizer_distribute_unregistered(t *testing.T) {
 	ctx, cancel, a := unexpHarness(t)
 
-	errors := a.Publisher().ReadErrors(1)
+	errors := a.Errors(1)
 
 	i := instance{
 		ctx:      ctx,
@@ -876,7 +876,7 @@ func TestAtomizer_distribute_unregistered(t *testing.T) {
 func TestAtomizer_exec_inst_err(t *testing.T) {
 	ctx, cancel, a := unexpHarness(t)
 
-	errors := a.Publisher().ReadErrors(1)
+	errors := a.Errors(1)
 
 	i := instance{
 		ctx:       ctx,

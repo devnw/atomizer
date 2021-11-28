@@ -18,7 +18,8 @@ type Atomizer interface {
 	Exec() error
 	Register(value ...interface{}) error
 	Wait()
-	Publisher() *event.Publisher
+	Events(buffer int) event.EventStream
+	Errors(buffer int) event.ErrorStream
 
 	// private methods enforce only this
 	// package can return an atomizer
@@ -54,8 +55,11 @@ func Atomize(
 
 func (*atomizer) isAtomizer() {}
 
-// Publisher returns the atomizer's event publisher
-func (a *atomizer) Publisher() *event.Publisher { return a.publisher }
+// Events returns an go.devnw.com/event.EventStream for the atomizer
+func (a *atomizer) Events(buffer int) event.EventStream { return a.publisher.ReadEvents(buffer) }
+
+// Errors returns an go.devnw.com/event.ErrorStream for the atomizer
+func (a *atomizer) Errors(buffer int) event.ErrorStream { return a.publisher.ReadErrors(buffer) }
 
 // Exec kicks off the processing of the atomizer by pulling in the
 // pre-registrations through init calls on imported libraries and

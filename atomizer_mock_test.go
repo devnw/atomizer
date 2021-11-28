@@ -319,7 +319,7 @@ func harness(
 
 	var events event.EventStream
 	if buffer >= 0 {
-		events = a.Publisher().ReadEvents(buffer)
+		events = a.Events(buffer)
 	}
 
 	// Start the execution threads
