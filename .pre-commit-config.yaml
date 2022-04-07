@@ -1,3 +1,5 @@
+exclude: '^package.json|package-lock.json$'
+fail_fast: false
 repos:
 -   repo: https://github.com/Contrast-Labs/detect-secrets
     rev: v1.1.2
@@ -8,23 +10,26 @@ repos:
         entry: detect-secrets-hook
         args: ['--baseline', '.secrets.baseline']
 -   repo: https://github.com/golangci/golangci-lint
-    rev: v1.43.0
+    rev: v1.45.2
     hooks:
     -   id: golangci-lint
--   repo: https://github.com/Bahjat/pre-commit-golang    
-    rev: c3086eea8af86847dbdff2e46b85a5fe3c9d9656 # pragma: allowlist secret
+-   repo: https://github.com/Bahjat/pre-commit-golang
+    rev: a4be1d0f860565649a450a8d480e541844c14a07 # pragma: allowlist secret
     hooks:
       - id: go-unit-tests
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
+    rev: v4.1.0
     hooks:
     -   id: check-json
     -   id: check-added-large-files
+    -   id: no-commit-to-branch
+        args: ['--branch', 'main']
     -   id: pretty-format-json
+        args: ['--autofix']
     -   id: check-merge-conflict
     -   id: check-yaml
 -   repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.30.0
+    rev: v0.31.1
     hooks:
     -   id: markdownlint-fix
 -   repo: https://github.com/koalaman/shellcheck-precommit
