@@ -15,12 +15,12 @@ var nooppropNob64ErrJSON = `{"electronId":"test","atomId":"test","starttime":"00
 var nooppropJSON = `{"electronId":"test","atomId":"test","starttime":"0001-01-01T00:00:00Z","endtime":"0001-01-01T00:00:00Z","result":{"result":"test"}}`
 
 var noopprop = &Properties{
-	ElectronID: "test",
-	AtomID:     "test",
-	Start:      time.Time{},
-	End:        time.Time{},
-	Error:      nil,
-	Result:     []byte(`{"result":"test"}`),
+	RequestID:   "test",
+	ProcessorID: "test",
+	Start:       time.Time{},
+	End:         time.Time{},
+	Error:       nil,
+	Result:      []byte(`{"result":"test"}`),
 }
 
 var nooppropErrJSON = `{"electronId":"test","atomId":"test","starttime":"0001-01-01T00:00:00Z","endtime":"0001-01-01T00:00:00Z","error":"eyJldmVudCI6eyJtZXNzYWdlIjoidGVzdCIsImVsZWN0cm9uSUQiOiIiLCJhdG9tSUQiOiIiLCJjb25kdWN0b3JJRCI6IiJ9LCJpbnRlcm5hbCI6bnVsbH0=","result":{"result":"test"}}`
@@ -28,12 +28,12 @@ var nooppropErrJSON = `{"electronId":"test","atomId":"test","starttime":"0001-01
 var nooppropNoMatchErrJSON = `{"electronId":"test","atomId":"test","starttime":"0001-01-01T00:00:00Z","endtime":"0001-01-01T00:00:00Z","error":"eyJub21hdGNoIjoibm9tYXRjaCJ9","result":{"result":"test"}}`
 
 var nooppropErr = &Properties{
-	ElectronID: "test",
-	AtomID:     "test",
-	Start:      time.Time{},
-	End:        time.Time{},
-	Error:      simple("test", nil),
-	Result:     []byte(`{"result":"test"}`),
+	RequestID:   "test",
+	ProcessorID: "test",
+	Start:       time.Time{},
+	End:         time.Time{},
+	Error:       simple("test", nil),
+	Result:      []byte(`{"result":"test"}`),
 }
 
 var nooppropNonAtomErrJSON = `{"electronId":"test","atomId":"test","starttime":"0001-01-01T00:00:00Z","endtime":"0001-01-01T00:00:00Z","error":"dGVzdA==","result":{"result":"test"}}`
@@ -41,12 +41,12 @@ var nooppropNonAtomErrJSON = `{"electronId":"test","atomId":"test","starttime":"
 var nooppropNonAtomNoMatchErrJSON = `{"electronId":"test","atomId":"test","starttime":"0001-01-01T00:00:00Z","endtime":"0001-01-01T00:00:00Z","error":"eyJub21hdGNoIjoibm9tYXRjaCJ9","result":{"result":"test"}}`
 
 var nooppropNonAtomErr = &Properties{
-	ElectronID: "test",
-	AtomID:     "test",
-	Start:      time.Time{},
-	End:        time.Time{},
-	Error:      errors.New("test"),
-	Result:     []byte(`{"result":"test"}`),
+	RequestID:   "test",
+	ProcessorID: "test",
+	Start:       time.Time{},
+	End:         time.Time{},
+	Error:       errors.New("test"),
+	Result:      []byte(`{"result":"test"}`),
 }
 
 func TestProperties_MarshalJSON(t *testing.T) {

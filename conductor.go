@@ -14,7 +14,7 @@ type Conductor interface {
 
 	// Receive gets the atoms from the source
 	// that are available to atomize
-	Receive(ctx context.Context) <-chan *Electron
+	Receive(ctx context.Context) <-chan *Request
 
 	// Complete mark the completion of an electron instance
 	// with applicable statistics
@@ -22,7 +22,7 @@ type Conductor interface {
 
 	// Send sends electrons back out through the conductor for
 	// additional processing
-	Send(ctx context.Context, electron *Electron) (<-chan *Properties, error)
+	Send(ctx context.Context, electron *Request) (<-chan *Properties, error)
 
 	// Close cleans up the conductor
 	Close()

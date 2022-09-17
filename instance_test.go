@@ -11,17 +11,17 @@ func Test_instance_bond(t *testing.T) {
 	tests := []struct {
 		name string
 		inst instance
-		atom Atom
+		atom Processor
 		err  bool
 	}{
 		{
 			"valid instance",
 			instance{
-				electron:   noopelectron,
-				conductor:  &noopconductor{},
-				properties: &Properties{},
-				ctx:        ctx,
-				cancel:     cancel,
+				req:    noopelectron,
+				trans:  &noopconductor{},
+				prop:   &Properties{},
+				ctx:    ctx,
+				cancel: cancel,
 			},
 			&noopatom{},
 			false,
@@ -29,10 +29,10 @@ func Test_instance_bond(t *testing.T) {
 		{
 			"invalid instance / missing electron",
 			instance{
-				conductor:  &noopconductor{},
-				properties: &Properties{},
-				ctx:        ctx,
-				cancel:     cancel,
+				trans:  &noopconductor{},
+				prop:   &Properties{},
+				ctx:    ctx,
+				cancel: cancel,
 			},
 			&noopatom{},
 			true,
@@ -40,10 +40,10 @@ func Test_instance_bond(t *testing.T) {
 		{
 			"invalid instance / missing conductor",
 			instance{
-				electron:   noopelectron,
-				properties: &Properties{},
-				ctx:        ctx,
-				cancel:     cancel,
+				req:    noopelectron,
+				prop:   &Properties{},
+				ctx:    ctx,
+				cancel: cancel,
 			},
 			&noopatom{},
 			true,
@@ -51,11 +51,11 @@ func Test_instance_bond(t *testing.T) {
 		{
 			"invalid instance / nil atom",
 			instance{
-				electron:   noopelectron,
-				conductor:  &noopconductor{},
-				properties: &Properties{},
-				ctx:        ctx,
-				cancel:     cancel,
+				req:    noopelectron,
+				trans:  &noopconductor{},
+				prop:   &Properties{},
+				ctx:    ctx,
+				cancel: cancel,
 			},
 			nil,
 			true,
@@ -81,17 +81,17 @@ func Test_instance_complete(t *testing.T) {
 	tests := []struct {
 		name string
 		inst instance
-		atom Atom
+		atom Processor
 		err  bool
 	}{
 		{
 			"valid instance",
 			instance{
-				electron:   noopelectron,
-				conductor:  &noopconductor{},
-				properties: &Properties{},
-				ctx:        ctx,
-				cancel:     cancel,
+				req:    noopelectron,
+				trans:  &noopconductor{},
+				prop:   &Properties{},
+				ctx:    ctx,
+				cancel: cancel,
 			},
 			&noopatom{},
 			false,
@@ -122,47 +122,47 @@ func Test_instance_execute(t *testing.T) {
 		{
 			"valid instance",
 			instance{
-				electron:   noopelectron,
-				conductor:  &noopconductor{},
-				properties: &Properties{},
-				atom:       &noopatom{},
+				req:   noopelectron,
+				trans: &noopconductor{},
+				prop:  &Properties{},
+				proc:  &noopatom{},
 			},
 			false,
 		},
 		{
 			"invalid instance - no electron",
 			instance{
-				conductor:  &noopconductor{},
-				properties: &Properties{},
-				atom:       &noopatom{},
+				trans: &noopconductor{},
+				prop:  &Properties{},
+				proc:  &noopatom{},
 			},
 			true,
 		},
 		{
 			"invalid instance - no conductor",
 			instance{
-				electron:   noopelectron,
-				properties: &Properties{},
-				atom:       &noopatom{},
+				req:  noopelectron,
+				prop: &Properties{},
+				proc: &noopatom{},
 			},
 			true,
 		},
 		{
 			"invalid instance - no atom",
 			instance{
-				electron:   noopelectron,
-				conductor:  &noopconductor{},
-				properties: &Properties{},
+				req:   noopelectron,
+				trans: &noopconductor{},
+				prop:  &Properties{},
 			},
 			true,
 		},
 		{
 			"invalid instance - panic atom",
 			instance{
-				electron:   noopelectron,
-				conductor:  &noopconductor{},
-				properties: &Properties{},
-				atom:       &panicatom{},
+				req:   noopelectron,
+				trans: &noopconductor{},
+				prop:  &Properties{},
+				proc:  &panicatom{},
 			},
 			true,
 		},
@@ -190,46 +190,46 @@ func Test_instance_Validate(t *testing.T) {
 		{
 			"valid instance",
 			instance{
-				electron:  noopelectron,
-				conductor: &noopconductor{},
-				atom:      &noopatom{},
+				req:   noopelectron,
+				trans: &noopconductor{},
+				proc:  &noopatom{},
 			},
 			true,
 		},
 		{
 			"invalid instance / nil atom",
 			instance{
-				electron:  noopelectron,
-				conductor: &noopconductor{},
+				req:   noopelectron,
+				trans: &noopconductor{},
 			},
 			false,
 		},
 		{
 			"invalid instance / invalid electron",
 			instance{
-				electron: &Electron{
-					SenderID: "empty",
-					ID:       "empty",
+				req: &Request{
+					Origin: "empty",
+					ID:     "empty",
 				},
-				conductor: &noopconductor{},
-				atom:      &noopatom{},
+				trans: &noopconductor{},
+				proc:  &noopatom{},
 			},
 			false,
 		},
 		{
 			"invalid instance / invalid electron",
 			instance{
-				electron:  &Electron{},
-				conductor: &noopconductor{},
-				atom:      &noopatom{},
+				req:   &Request{},
+				trans: &noopconductor{},
+				proc:  &noopatom{},
 			},
 			false,
 		},
 		{
 			"invalid instance / invalid conductor",
 			instance{
-				electron: noopelectron,
-				atom:     &noopatom{},
+				req:  noopelectron,
+				proc: &noopatom{},
 			},
 			false,
 		},

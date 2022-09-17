@@ -13,17 +13,17 @@ import (
 var pay = `{"test":"test"}`
 var pay64Encoded = `eyJ0ZXN0IjoidGVzdCJ9`
 
-var nonb64 = &Electron{
-	SenderID: "empty",
-	ID:       "empty",
-	AtomID:   "empty",
-	Payload:  []byte(pay),
+var nonb64 = &Request{
+	Origin:  "empty",
+	ID:      "empty",
+	Atom:    "empty",
+	Payload: []byte(pay),
 }
 
 func TestElectron_MarshalJSON(t *testing.T) {
 	tests := []struct {
 		name     string
-		e        *Electron
+		e        *Request
 		expected string
 		err      bool
 	}{
@@ -66,7 +66,7 @@ func TestElectron_MarshalJSON(t *testing.T) {
 func TestElectron_UnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name     string
-		expected *Electron
+		expected *Request
 		json     string
 		err      bool
 	}{
@@ -90,7 +90,7 @@ func TestElectron_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			"invalid json blob",
-			&Electron{},
+			&Request{},
 			`{"empty"}`,
 			true,
 		},
@@ -98,7 +98,7 @@ func TestElectron_UnmarshalJSON(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			e := &Electron{}
+			e := &Request{}
 			err := json.Unmarshal([]byte(test.json), &e)
 
 			if err != nil && !test.err {
@@ -123,7 +123,7 @@ func TestElectron_UnmarshalJSON(t *testing.T) {
 func TestElectron_Validate(t *testing.T) {
 	tests := []struct {
 		name  string
-		e     *Electron
+		e     *Request
 		valid bool
 	}{
 		{
@@ -133,37 +133,37 @@ func TestElectron_Validate(t *testing.T) {
 		},
 		{
 			"invalid electron",
-			&Electron{},
+			&Request{},
 			false,
 		},
 		{
 			"invalid electron / only sender",
-			&Electron{SenderID: "test"},
+			&Request{Origin: "test"},
 			false,
 		},
 		{
 			"invalid electron / only atom",
-			&Electron{AtomID: "test"},
+			&Request{Atom: "test"},
 			false,
 		},
 		{
 			"invalid electron / only ID",
-			&Electron{ID: "test"},
+			&Request{ID: "test"},
 			false,
 		},
 		{
 			"invalid electron / sender & atom",
-			&Electron{SenderID: "test", AtomID: "test"},
+			&Request{Origin: "test", Atom: "test"},
 			false,
 		},
 		{
 			"invalid electron / ID & sender",
-			&Electron{ID: "test", SenderID: "test"},
+			&Request{ID: "test", Origin: "test"},
 			false,
 		},
 		{
 			"invalid electron / ID & atom",
-			&Electron{ID: "test", AtomID: "test"},
+			&Request{ID: "test", Atom: "test"},
 			false,
 		},
 	}

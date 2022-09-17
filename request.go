@@ -6,6 +6,7 @@
 package engine
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/gob"
 	"encoding/json"
@@ -14,29 +15,21 @@ import (
 )
 
 func init() {
-	gob.Register(Electron{})
+	gob.Register(Request{})
 }
 
-// Electron is the base electron that MUST parse from the payload
+// Request is the base electron that MUST parse from the payload
 // from the conductor
-type Electron struct {
-	// SenderID is the unique identifier for the node that sent the
-	// electron
-	SenderID string
+type Request struct {
+	// Origin is the unique identifier for the node that sent the electron
+	Origin string
 
 	// ID is the unique identifier of this electron
 	ID string
 
-	// AtomID is the identifier of the atom for this electron instance
-	// this is generally `package.Type`. Use the atomizer.ID() method
-	// if unsure of the type for an Atom.
-	AtomID string
-
-	// Timeout is the maximum time duration that should be allowed
-	// for this instance to process. After the duration is exceeded
-	// the context should be canceled and the processing released
-	// and a failure sent back to the conductor
-	Timeout *time.Duration
+	// AtomID is the unique identifier of the atom to execute, this is
+	// the `go` type of atom to execute
+	ProcessorID string
 
 	// CopyState lets atomizer know if it should copy the state of the
 	// original atom registration to the new atom instance when processing
@@ -52,15 +45,45 @@ type Electron struct {
 	// delay unmarshal of the payload information so the atom can do it
 	// internally
 	Payload []byte
+
+	// m is the maker for instantiating the new atom
+	m *maker
+
+	// timeout is the maximum time duration that should be allowed
+	// for this instance to process. After the duration is exceeded
+	// the context should be canceled and the processing released
+	// and a failure sent back to the conductor
+	timeout *time.Duration
+}
+
+func (e *Request) Context(parent context.Context) (
+	context.Context,
+	context.CancelFunc,
+) {
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	if e.timeout != nil {
+		ctx, cancel = context.WithTimeout(parent, *e.timeout)
+	} else {
+		ctx, cancel = context.WithCancel(parent)
+	}
+
+	// Set values on the context for the atom to use
+	ctx = context.WithValue(ctx, ORIGIN, e.Origin)
+	ctx = context.WithValue(ctx, PROCESSORID, e.ProcessorID)
+	ctx = context.WithValue(ctx, REQUESTID, e.ID)
+
+	return ctx, cancel
 }
 
 // UnmarshalJSON reads in a []byte of JSON data and maps it to the Electron
 // struct properly for use throughout Atomizer
-func (e *Electron) UnmarshalJSON(data []byte) error {
+func (e *Request) UnmarshalJSON(data []byte) error {
 	jsonE := struct {
-		SenderID  string          `json:"senderid"`
+		Origin    string          `json:"origin"`
+		Atom      string          `json:"atom"`
 		ID        string          `json:"id"`
-		AtomID    string          `json:"atomid"`
 		Timeout   *time.Duration  `json:"timeout,omitempty"`
 		CopyState bool            `json:"copystate,omitempty"`
 		Payload   json.RawMessage `json:"payload,omitempty"`
@@ -71,10 +94,16 @@ func (e *Electron) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	e.SenderID = jsonE.SenderID
+	m, err := Get[*maker](jsonE.Atom)
+	if err != nil {
+		return err
+	}
+
+	e.Origin = jsonE.Origin
 	e.ID = jsonE.ID
-	e.AtomID = jsonE.AtomID
-	e.Timeout = jsonE.Timeout
+	e.ProcessorID = jsonE.Atom
+	e.m = m
+	e.timeout = jsonE.Timeout
 
 	if jsonE.Payload != nil {
 		pay := strings.Trim(string(jsonE.Payload), "\"")
@@ -88,30 +117,30 @@ func (e *Electron) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON implements the custom json marshaler for electron
-func (e *Electron) MarshalJSON() ([]byte, error) {
+func (e *Request) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		SenderID  string          `json:"senderid"`
+		Origin    string          `json:"origin"`
 		ID        string          `json:"id"`
-		AtomID    string          `json:"atomid"`
+		AtomID    string          `json:"atom"`
 		Timeout   *time.Duration  `json:"timeout,omitempty"`
 		CopyState bool            `json:"copystate,omitempty"`
 		Payload   json.RawMessage `json:"payload,omitempty"`
 	}{
-		SenderID: e.SenderID,
-		ID:       e.ID,
-		AtomID:   e.AtomID,
-		Timeout:  e.Timeout,
-		Payload:  json.RawMessage(e.Payload),
+		Origin:  e.Origin,
+		ID:      e.ID,
+		AtomID:  e.ProcessorID,
+		Timeout: e.timeout,
+		Payload: json.RawMessage(e.Payload),
 	})
 }
 
 // Validate ensures that the electron information is intact for proper
 // execution
-func (e *Electron) Validate() (valid bool) {
+func (e *Request) Validate() (valid bool) {
 	if e != nil &&
-		e.SenderID != "" &&
+		e.Origin != "" &&
 		e.ID != "" &&
-		e.AtomID != "" {
+		e.ProcessorID != "" {
 		valid = true
 	}
 

@@ -11,12 +11,16 @@ github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 h1:RWengNIwukTxcDr9
 github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826/go.mod h1:TaXosZuwdSHYgviHp1DAtfrULt5eUgsSMsZf+YrPgl8=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+go.atomizer.io/stream v1.0.7 h1:ioEU8tmj6hif3Ha1d0DiFZ+IDeV1ZceIOqXybRrvi4I=
+go.atomizer.io/stream v1.0.7/go.mod h1:dZMYp2fUFjWlQke91O/kJb+FslZy8thQZzUl9vVMr84=
 go.devnw.com/alog v1.1.1 h1:u+85qyAwvcm0t46brAI8/DNW1FhW+XV+2Xk9MCs621I=
 go.devnw.com/alog v1.1.1/go.mod h1:+C3sYPkWZKet8XEvZ7DCcmEa30QQ4BRl67UcGLywOXc=
 go.devnw.com/event v1.0.3 h1:8vcAFikzc39vvDEmIhdU4NfH/h80v6iyQu8BnlwEH3A=
 go.devnw.com/event v1.0.3/go.mod h1:wc9P8ENcNDAxrIaOdqfPKgNbDwYcuvgYK60KgM61o3s=
 go.devnw.com/validator v1.0.8 h1:IUuu8o7WKZPf5WsiUWvdU7qwBZvWwKezpZQnXn2gX+k=
 go.devnw.com/validator v1.0.8/go.mod h1:5kfqytQCBGTupXx1ZoIfV97qvKtsAi6lt2HfmvjWa6A=
+go.structs.dev/gen v1.0.1 h1:tp81qXTWF61tgmyCVqBBdQcEMp9Ftlo5/ekkm+wVkYk=
+go.structs.dev/gen v1.0.1/go.mod h1:Y1KXGuqAQdeL0G485oZzpgVwVZ4x+/7/ViNdQJuINo4=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
 golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
 golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=

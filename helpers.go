@@ -40,6 +40,6 @@ func _ctxT(
 }
 
 // ID returns the registration id for the passed in object type
-func ID(v interface{}) string {
+func ID(v any) string {
 	return strings.Trim(fmt.Sprintf("%T", v), "*")
 }

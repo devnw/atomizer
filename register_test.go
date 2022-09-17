@@ -14,7 +14,7 @@ func TestRegister(t *testing.T) {
 	tests := []struct {
 		name  string
 		key   string
-		value interface{}
+		value any
 		err   bool
 	}{
 		{

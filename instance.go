@@ -7,18 +7,19 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.devnw.com/validator"
 )
 
 type instance struct {
-	electron   *Electron
-	conductor  Conductor
-	atom       Atom
-	properties *Properties
-	ctx        context.Context
-	cancel     context.CancelFunc
+	req    *Request
+	trans  Conductor
+	proc   Processor
+	prop   *Properties
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	// TODO: add an actions channel here that the monitor can keep
 	// an eye on for this bonded electron/atom combo
@@ -28,24 +29,22 @@ type instance struct {
 // corresponding atom in the atomizer registrations such that
 // the execute method of the instance can properly exercise the
 // Process method of the interface
-func (i *instance) bond(atom Atom) (err error) {
+func (i *instance) bond(atom Processor) (err error) {
 	if err = validator.Assert(
-		i.electron,
-		i.conductor,
+		i.req,
+		i.trans,
 		atom,
 	); err != nil {
 		return &Error{
-			Event: &Event{
-				Message: "error while bonding atom instance",
-				AtomID:  ID(atom),
-			},
-			Internal: err,
+			Msg:   "error while bonding atom instance",
+			Meta:  Metadata{PROCESSORID: ID(atom)},
+			Inner: err,
 		}
 	}
 
 	// register the atom internally because
 	// the instance is valid
-	i.atom = atom
+	i.proc = atom
 
 	return nil
 }
@@ -54,20 +53,20 @@ func (i *instance) bond(atom Atom) (err error) {
 // the results to the conductor
 func (i *instance) complete() error {
 	// Set the end time and status in the properties
-	i.properties.End = time.Now()
+	i.prop.End = time.Now()
 
-	if !validator.Valid(i.conductor) {
+	if !validator.Valid(i.trans) {
 		return &Error{
-			Event: &Event{
-				Message:    "conductor validation failed",
-				AtomID:     ID(i.atom),
-				ElectronID: i.electron.ID,
+			Msg: "conductor validation failed",
+			Meta: Metadata{
+				PROCESSORID: ID(i.proc),
+				REQUESTID:   i.req.ID,
 			},
 		}
 	}
 
 	// Push the completed instance properties to the conductor
-	return i.conductor.Complete(i.ctx, i.properties)
+	return i.trans.Complete(i.ctx, i.prop)
 }
 
 // execute runs the process method on the bonded atom / electron pair
@@ -75,12 +74,12 @@ func (i *instance) execute(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = &Error{
-				Event: &Event{
-					Message:    "panic in atomizer",
-					AtomID:     ID(i.atom),
-					ElectronID: i.electron.ID,
+				Msg: "panic in atomizer",
+				Meta: Metadata{
+					PROCESSORID: ID(i.proc),
+					REQUESTID:   i.req.ID,
 				},
-				Internal: ptoe(r),
+				Inner: fmt.Errorf("%v", r),
 			}
 
 			return
@@ -96,28 +95,28 @@ func (i *instance) execute(ctx context.Context) (err error) {
 	// to execute processing
 	if !validator.Valid(i) {
 		return &Error{
-			Event: &Event{
-				Message: "instance validation failed",
-				AtomID:  ID(i.atom),
+			Msg: "instance validation failed",
+			Meta: Metadata{
+				PROCESSORID: ID(i.proc),
+				REQUESTID:   i.req.ID,
 			},
 		}
 	}
 
 	// Establish internal context
-	i.ctx, i.cancel = _ctxT(ctx, i.electron.Timeout)
+	i.ctx, i.cancel = i.req.Context(ctx)
 
-	i.properties = &Properties{
-		ElectronID: i.electron.ID,
-		AtomID:     ID(i.atom),
-		Start:      time.Now(),
+	i.prop = &Properties{
+		RequestID:   i.req.ID,
+		ProcessorID: ID(i.proc),
+		Start:       time.Now(),
 	}
 
 	// TODO: Setup with a heartbeat for monitoring processing of the
 	// bonded atom stream in from the process method
 
 	// Execute the process method of the atom
-	i.properties.Result, i.properties.Error = i.atom.Process(
-		i.ctx, i.conductor, i.electron)
+	i.prop.Result, i.prop.Error = i.proc.Process(i.ctx, i.req.Payload)
 
 	// TODO: The processing has finished for this bonded atom and the
 	// results need to be calculated and the properties sent back to the
@@ -146,9 +145,9 @@ func (i *instance) execute(ctx context.Context) (err error) {
 func (i *instance) Validate() (valid bool) {
 	if i != nil {
 		if validator.Valid(
-			i.electron,
-			i.conductor,
-			i.atom) {
+			i.req,
+			i.trans,
+			i.proc) {
 			valid = true
 		}
 	}

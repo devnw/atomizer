@@ -17,30 +17,30 @@ import (
 
 type tresult struct {
 	result   string
-	electron *Electron
+	electron *Request
 	// err      bool
 	// panic    bool
 }
 
-var noopelectron = &Electron{
-	SenderID: "empty",
-	ID:       "empty",
-	AtomID:   "empty",
+var noopelectron = &Request{
+	Origin: "empty",
+	ID:     "empty",
+	Atom:   "empty",
 }
 
-var noopinvalidelectron = &Electron{}
+var noopinvalidelectron = &Request{}
 
 type invalidconductor struct{}
 
 type noopconductor struct{}
 
-func (*noopconductor) Receive(ctx context.Context) <-chan *Electron {
+func (*noopconductor) Receive(ctx context.Context) <-chan *Request {
 	return nil
 }
 
 func (*noopconductor) Send(
 	ctx context.Context,
-	electron *Electron,
+	electron *Request,
 ) (<-chan *Properties, error) {
 	return nil, nil
 }
@@ -59,7 +59,7 @@ type noopatom struct{}
 func (*noopatom) Process(
 	ctx context.Context,
 	conductor Conductor,
-	electron *Electron,
+	electron *Request,
 ) ([]byte, error) {
 	return nil, nil
 }
@@ -69,7 +69,7 @@ type panicatom struct{}
 func (*panicatom) Process(
 	ctx context.Context,
 	conductor Conductor,
-	electron *Electron,
+	electron *Request,
 ) ([]byte, error) {
 	panic("test panic")
 }
@@ -79,7 +79,7 @@ type invalidatom struct{}
 func (*invalidatom) Process(
 	ctx context.Context,
 	conductor Conductor,
-	electron *Electron,
+	electron *Request,
 ) ([]byte, error) {
 	return nil, nil
 }
@@ -89,17 +89,17 @@ func (*invalidatom) Validate() bool {
 }
 
 type validconductor struct {
-	echan chan *Electron
+	echan chan *Request
 	valid bool
 }
 
-func (cond *validconductor) Receive(ctx context.Context) <-chan *Electron {
+func (cond *validconductor) Receive(ctx context.Context) <-chan *Request {
 	return cond.echan
 }
 
 func (cond *validconductor) Send(
 	ctx context.Context,
-	electron *Electron,
+	electron *Request,
 ) (response <-chan *Properties, err error) {
 	return response, err
 }
@@ -119,11 +119,11 @@ func (cond *validconductor) Close() {}
 
 // TODO: Move passthrough as a conductor implementation for in-node processing
 type passthrough struct {
-	input   chan *Electron
+	input   chan *Request
 	results sync.Map
 }
 
-func (pt *passthrough) Receive(ctx context.Context) <-chan *Electron {
+func (pt *passthrough) Receive(ctx context.Context) <-chan *Request {
 	return pt.input
 }
 
@@ -133,23 +133,23 @@ func (pt *passthrough) Complete(ctx context.Context, p *Properties) error {
 	if !validator.Valid(p) {
 		return errors.Errorf(
 			"invalid properties returned for electron [%s]",
-			p.ElectronID,
+			p.RequestID,
 		)
 	}
 
 	// for rabbit mq drop properties onto the /basepath/electronid message path
-	value, ok := pt.results.Load(p.ElectronID)
+	value, ok := pt.results.Load(p.RequestID)
 	if !ok {
 		return errors.Errorf(
 			"unable to load properties channel from sync map for electron [%s]",
-			p.ElectronID,
+			p.RequestID,
 		)
 	}
 
 	if value == nil {
 		return errors.Errorf(
 			"nil properties channel returned for electron [%s]",
-			p.ElectronID,
+			p.RequestID,
 		)
 	}
 
@@ -171,7 +171,7 @@ func (pt *passthrough) Complete(ctx context.Context, p *Properties) error {
 
 func (pt *passthrough) Send(
 	ctx context.Context,
-	electron *Electron,
+	electron *Request,
 ) (<-chan *Properties, error) {
 	var err error
 	result := make(chan *Properties)
@@ -205,11 +205,11 @@ type printer struct{ t *testing.T }
 
 type state struct{ ID string }
 
-func (s *state) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
+func (s *state) Process(ctx context.Context, conductor Conductor, electron *Request) (result []byte, err error) {
 	return []byte(s.ID), nil
 }
 
-func (p *printer) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
+func (p *printer) Process(ctx context.Context, conductor Conductor, electron *Request) (result []byte, err error) {
 	if validator.Valid(electron) {
 		var payload printerdata
 
@@ -223,7 +223,7 @@ func (p *printer) Process(ctx context.Context, conductor Conductor, electron *El
 
 type returner struct{}
 
-func (b *returner) Process(ctx context.Context, conductor Conductor, electron *Electron) (result []byte, err error) {
+func (b *returner) Process(ctx context.Context, conductor Conductor, electron *Request) (result []byte, err error) {
 	if !validator.Valid(electron) {
 		return nil, errors.New("invalid electron")
 	}
@@ -264,12 +264,12 @@ type printerdata struct {
 	Message string `json:"message"`
 }
 
-func newElectron(atomID string, payload []byte) *Electron {
-	return &Electron{
-		SenderID: uuid.New().String(),
-		ID:       uuid.New().String(),
-		AtomID:   atomID,
-		Payload:  payload,
+func newElectron(atomID string, payload []byte) *Request {
+	return &Request{
+		Origin:  uuid.New().String(),
+		ID:      uuid.New().String(),
+		Atom:    atomID,
+		Payload: payload,
 	}
 }
 
@@ -277,10 +277,10 @@ func newElectron(atomID string, payload []byte) *Electron {
 func harness(
 	ctx context.Context,
 	buffer int,
-	atoms ...Atom,
+	atoms ...Processor,
 ) (Conductor, event.EventStream, error) {
 	pass := &passthrough{
-		input: make(chan *Electron, 1),
+		input: make(chan *Request, 1),
 	}
 
 	// Register the conductor so it's picked up

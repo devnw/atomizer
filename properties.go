@@ -19,12 +19,12 @@ import (
 // processing of an atom has completed so that it can be sent to the
 // original requestor
 type Properties struct {
-	ElectronID string
-	AtomID     string
-	Start      time.Time
-	End        time.Time
-	Error      error
-	Result     []byte
+	RequestID   string
+	ProcessorID string
+	Start       time.Time
+	End         time.Time
+	Error       error
+	Result      []byte
 }
 
 // UnmarshalJSON reads in a []byte of JSON data and maps it to the Properties
@@ -54,8 +54,8 @@ func (p *Properties) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	p.ElectronID = jsonP.ElectronID
-	p.AtomID = jsonP.AtomID
+	p.RequestID = jsonP.ElectronID
+	p.ProcessorID = jsonP.AtomID
 	p.Start = jsonP.Start
 	p.End = jsonP.End
 	p.Result = []byte(jsonP.Result)
@@ -87,8 +87,8 @@ func (p *Properties) MarshalJSON() ([]byte, error) {
 		Error      []byte          `json:"error,omitempty"`
 		Result     json.RawMessage `json:"result"`
 	}{
-		ElectronID: p.ElectronID,
-		AtomID:     p.AtomID,
+		ElectronID: p.RequestID,
+		AtomID:     p.ProcessorID,
 		Start:      p.Start,
 		End:        p.End,
 		Error:      eString,
@@ -108,8 +108,8 @@ func (p *Properties) Equal(p2 *Properties) bool {
 		eEquals = true
 	}
 
-	return p.ElectronID == p2.ElectronID &&
-		p.AtomID == p2.AtomID &&
+	return p.RequestID == p2.RequestID &&
+		p.ProcessorID == p2.ProcessorID &&
 		p.Start.Equal(p2.Start) &&
 		p.End.Equal(p2.End) &&
 		bytes.Equal(p.Result, p2.Result) &&
