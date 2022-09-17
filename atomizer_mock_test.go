@@ -310,12 +310,10 @@ func harness(
 	}
 
 	// Initialize the atomizer
-	mizer, err := Atomize(ctx)
+	a, err := Atomize(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating atomizer | %s", err)
 	}
-
-	a, _ := mizer.(*atomizer)
 
 	var events event.EventStream
 	if buffer >= 0 {

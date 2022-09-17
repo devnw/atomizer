@@ -559,12 +559,12 @@ func TestAtomizer_register_Errs(t *testing.T) {
 
 	tests := []struct {
 		key   string
-		a     *atomizer
+		a     *Atomizer
 		value interface{}
 	}{
 		{
 			"invalid conductor test",
-			&atomizer{
+			&Atomizer{
 				ctx:       ctx,
 				publisher: event.NewPublisher(ctx),
 			},
@@ -572,7 +572,7 @@ func TestAtomizer_register_Errs(t *testing.T) {
 		},
 		{
 			"Invalid Struct Type",
-			&atomizer{
+			&Atomizer{
 				ctx:       ctx,
 				publisher: event.NewPublisher(ctx),
 			},
@@ -602,22 +602,22 @@ func TestAtomizer_Register_Errs(t *testing.T) {
 
 	tests := []struct {
 		key   string
-		a     *atomizer
+		a     *Atomizer
 		value interface{}
 	}{
 		{
 			"panic test, nil channels",
-			&atomizer{publisher: event.NewPublisher(ctx)},
+			&Atomizer{publisher: event.NewPublisher(ctx)},
 			&validconductor{make(chan *Electron), true},
 		},
 		{
 			"close context test",
-			&atomizer{ctx: ctx, publisher: event.NewPublisher(ctx)},
+			&Atomizer{ctx: ctx, publisher: event.NewPublisher(ctx)},
 			&validconductor{make(chan *Electron), true},
 		},
 		{
 			"Invalid Struct Type",
-			&atomizer{publisher: event.NewPublisher(ctx)},
+			&Atomizer{publisher: event.NewPublisher(ctx)},
 			&struct{}{},
 		},
 	}
@@ -634,7 +634,7 @@ func TestAtomizer_Register_Errs(t *testing.T) {
 }
 
 func TestAtomizer_receive_panic(t *testing.T) {
-	a := &atomizer{
+	a := &Atomizer{
 		ctx:       context.Background(),
 		publisher: event.NewPublisher(context.Background()),
 	}
@@ -657,7 +657,7 @@ func TestAtomizer_receive_panic(t *testing.T) {
 }
 
 func TestAtomizer_receive_nilreg(t *testing.T) {
-	a := &atomizer{
+	a := &Atomizer{
 		ctx:       context.Background(),
 		publisher: event.NewPublisher(context.Background()),
 	}
@@ -673,7 +673,7 @@ func TestAtomizer_receive_nilreg(t *testing.T) {
 }
 
 func TestAtomizer_receive_closedReg(t *testing.T) {
-	a := &atomizer{
+	a := &Atomizer{
 		ctx:           context.Background(),
 		registrations: make(chan interface{}),
 		publisher:     event.NewPublisher(context.Background()),
@@ -692,7 +692,7 @@ func TestAtomizer_receive_closedReg(t *testing.T) {
 }
 
 func TestAtomizer_receiveAtom_invalid(t *testing.T) {
-	a := &atomizer{publisher: event.NewPublisher(context.Background())}
+	a := &Atomizer{publisher: event.NewPublisher(context.Background())}
 
 	err := a.receiveAtom(&invalidatom{})
 	if err == nil {
@@ -704,7 +704,7 @@ func TestAtomizer_conduct_closedreceiver(t *testing.T) {
 	c := &validconductor{echan: make(chan *Electron)}
 	close(c.echan)
 
-	a := &atomizer{
+	a := &Atomizer{
 		ctx:       context.Background(),
 		publisher: event.NewPublisher(context.Background()),
 	}
@@ -723,7 +723,7 @@ func TestAtomizer_conduct_panic(t *testing.T) {
 	c := &validconductor{echan: make(chan *Electron)}
 	close(c.echan)
 
-	a := &atomizer{publisher: event.NewPublisher(context.Background())}
+	a := &Atomizer{publisher: event.NewPublisher(context.Background())}
 
 	errors := a.Errors(2)
 
@@ -744,7 +744,7 @@ func TestAtomizer_conduct_panic(t *testing.T) {
 
 func TestAtomizer_conduct_invalidE(t *testing.T) {
 	c := &passthrough{input: make(chan *Electron)}
-	a := &atomizer{
+	a := &Atomizer{
 		ctx:       context.Background(),
 		publisher: event.NewPublisher(context.Background()),
 	}
@@ -768,7 +768,7 @@ func TestAtomizer_conduct_invalidE(t *testing.T) {
 }
 
 func TestAtomizer_split_closedEchan(t *testing.T) {
-	a := &atomizer{
+	a := &Atomizer{
 		ctx:       context.Background(),
 		publisher: event.NewPublisher(context.Background()),
 	}
@@ -788,7 +788,7 @@ func TestAtomizer_split_closedEchan(t *testing.T) {
 
 func TestAtomizer_Wait(t *testing.T) {
 	ctx, cancel := _ctx(context.TODO())
-	a := &atomizer{
+	a := &Atomizer{
 		ctx:       ctx,
 		cancel:    cancel,
 		publisher: event.NewPublisher(ctx),
@@ -800,7 +800,7 @@ func TestAtomizer_Wait(t *testing.T) {
 
 func TestAtomizer_distribute_closedEchan(t *testing.T) {
 	ctx, cancel := _ctx(context.TODO())
-	a := &atomizer{
+	a := &Atomizer{
 		ctx:       ctx,
 		cancel:    cancel,
 		electrons: make(chan instance),
@@ -820,7 +820,7 @@ func TestAtomizer_distribute_closedEchan(t *testing.T) {
 
 func TestAtomizer_exec_ERR(t *testing.T) {
 	ctx, cancel := _ctx(context.TODO())
-	a := &atomizer{
+	a := &Atomizer{
 		ctx:       ctx,
 		cancel:    cancel,
 		publisher: event.NewPublisher(ctx),
@@ -838,16 +838,11 @@ func TestAtomizer_exec_ERR(t *testing.T) {
 	}
 }
 
-func unexpHarness(t *testing.T) (context.Context, context.CancelFunc, *atomizer) {
+func unexpHarness(t *testing.T) (context.Context, context.CancelFunc, *Atomizer) {
 	ctx, cancel := _ctx(context.TODO())
-	mizer, err := Atomize(ctx)
+	a, err := Atomize(ctx)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	a, ok := mizer.(*atomizer)
-	if !ok {
-		t.Fatal("unable to cast atomizer")
 	}
 
 	return ctx, cancel, a
@@ -902,7 +897,7 @@ func TestAtomizer_Validate(t *testing.T) {
 	}{
 		{
 			"ValidAtomizerTest",
-			&atomizer{
+			&Atomizer{
 				electrons: make(chan instance),
 				bonded:    make(chan instance),
 				ctx:       context.Background(),

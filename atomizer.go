@@ -7,6 +7,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -16,6 +17,33 @@ import (
 	"go.devnw.com/validator"
 )
 
+// Atomize initialize instance of the atomizer to start reading from
+// conductors and execute bonded electrons/atoms
+//
+// NOTE: Registrations can be added through this method and OVERRIDE any
+// existing registrations of the same Atom or Conductor.
+func Atomize(
+	ctx context.Context,
+	registrations ...interface{},
+) (*Atomizer, error) {
+	err := Register(registrations...)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := _ctx(ctx)
+
+	return &Atomizer{
+		ctx:           ctx,
+		cancel:        cancel,
+		electrons:     make(chan instance),
+		bonded:        make(chan instance),
+		registrations: make(chan interface{}),
+		atoms:         make(map[string]chan<- instance),
+		publisher:     event.NewPublisher(ctx),
+	}, nil
+}
+
 // atomizer facilitates the execution of tasks (aka Electrons) which
 // are received from the configured sources these electrons can be
 // distributed across many instances of the atomizer on different nodes
@@ -24,7 +52,7 @@ import (
 // complexity minimizing time to run and allowing for the distributed
 // system to take on the burden of long running processes as a whole
 // rather than a single process handling the overall load
-type atomizer struct {
+type Atomizer struct {
 
 	// Electron Channel
 	electrons chan instance
@@ -49,10 +77,101 @@ type atomizer struct {
 	execSyncOnce sync.Once
 }
 
+// Events returns an go.devnw.com/event.EventStream for the atomizer
+func (a *Atomizer) Events(buffer int) event.EventStream {
+	return a.publisher.ReadEvents(buffer)
+}
+
+// Errors returns an go.devnw.com/event.ErrorStream for the atomizer
+func (a *Atomizer) Errors(buffer int) event.ErrorStream {
+	return a.publisher.ReadErrors(buffer)
+}
+
+// Exec kicks off the processing of the atomizer by pulling in the
+// pre-registrations through init calls on imported libraries and
+// starts up the receivers for atoms and conductors
+func (a *Atomizer) Exec() (err error) {
+	// Execute on the atomizer should only ever be run once
+	a.execSyncOnce.Do(func() {
+		defer a.publisher.EventFunc(a.ctx, func() event.Event {
+			return makeEvent("pulling conductor and atom registrations")
+		})
+
+		// Initialize the registrations in the Atomizer package
+		for _, r := range Registrations() {
+			a.register(r)
+		}
+
+		// Start up the receivers
+		go a.receive()
+
+		// Setup the distribution loop for incoming electrons
+		// so that they can be properly fanned out to the
+		// atom receivers
+		go a.distribute()
+
+		// TODO: Setup the instance receivers for monitoring of
+		// individual instances as well as sending of outbound
+		// electrons
+	})
+
+	return err
+}
+
+// Register allows you to add additional type registrations to the atomizer
+// (ie. Conductors and Atoms)
+func (a *Atomizer) Register(values ...interface{}) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = &Error{
+				Event: &Event{
+					Message: "panic in atomizer",
+				},
+				Internal: ptoe(r),
+			}
+		}
+	}()
+
+	for _, value := range values {
+		if !validator.Valid(value) {
+			// TODO: create event here indicating that
+			// a value was invalid and not registered
+			continue
+		}
+
+		switch v := value.(type) {
+		case Conductor, Atom:
+			// Pass the value on the registrations
+			// channel to be received
+			select {
+			case <-a.ctx.Done():
+				return simple("context closed", nil)
+			case a.registrations <- v:
+			}
+		default:
+			return simple(
+				fmt.Sprintf(
+					"invalid value in registration %s",
+					ID(value),
+				),
+				nil,
+			)
+		}
+	}
+
+	return err
+}
+
+// Wait blocks on the context done channel to allow for the executable
+// to block for the atomizer to finish processing
+func (a *Atomizer) Wait() {
+	<-a.ctx.Done()
+}
+
 // Initialize the go routines that will read from the conductors concurrently
 // while other parts of the atomizer reads in the inputs and executes the
 // instances of electrons
-func (a *atomizer) receive() {
+func (a *Atomizer) receive() {
 	if a.registrations == nil {
 		a.publisher.ErrorFunc(a.ctx, func() error {
 			return &Error{
@@ -87,7 +206,7 @@ func (a *atomizer) receive() {
 
 // register the different receivable interfaces into the atomizer from
 // wherever they were sent from
-func (a *atomizer) register(input interface{}) {
+func (a *Atomizer) register(input interface{}) {
 	if !validator.Valid(input) {
 		a.publisher.ErrorFunc(a.ctx, func() error {
 			return simple("invalid registration "+ID(input), nil)
@@ -127,7 +246,7 @@ func (a *atomizer) register(input interface{}) {
 }
 
 // receiveConductor setups a retrieval loop for the conductor
-func (a *atomizer) receiveConductor(conductor Conductor) error {
+func (a *Atomizer) receiveConductor(conductor Conductor) error {
 	if !validator.Valid(conductor) {
 		return &Error{Event: &Event{
 			Message:     "invalid conductor",
@@ -142,7 +261,7 @@ func (a *atomizer) receiveConductor(conductor Conductor) error {
 
 // conduct reads in from a specific electron channel of a conductor and drop
 // it onto the atomizer channel for electrons
-func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
+func (a *Atomizer) conduct(ctx context.Context, conductor Conductor) {
 	// Self Heal - Re-place the conductor on the register channel for
 	// the atomizer to re-initialize so this stack can be
 	// garbage collected
@@ -228,7 +347,7 @@ func (a *atomizer) conduct(ctx context.Context, conductor Conductor) {
 }
 
 // receiveAtom setups a retrieval loop for the conductor being passed in
-func (a *atomizer) receiveAtom(atom Atom) error {
+func (a *Atomizer) receiveAtom(atom Atom) error {
 	if !validator.Valid(atom) {
 		return &Error{
 			Event: &Event{
@@ -253,7 +372,7 @@ func (a *atomizer) receiveAtom(atom Atom) error {
 	return nil
 }
 
-func (a *atomizer) split(atom Atom) chan<- instance {
+func (a *Atomizer) split(atom Atom) chan<- instance {
 	electrons := make(chan instance)
 
 	go a._split(atom, electrons)
@@ -261,7 +380,7 @@ func (a *atomizer) split(atom Atom) chan<- instance {
 	return electrons
 }
 
-func (a *atomizer) _split(
+func (a *Atomizer) _split(
 	atom Atom,
 	electrons <-chan instance,
 ) {
@@ -323,7 +442,7 @@ func (a *atomizer) _split(
 	}
 }
 
-func (a *atomizer) exec(inst instance, atom Atom) {
+func (a *Atomizer) exec(inst instance, atom Atom) {
 	// bond the new atom instantiation to the electron instance
 	if err := inst.bond(atom); err != nil {
 		a.publisher.ErrorFunc(a.ctx, func() error {
@@ -377,7 +496,7 @@ func (a *atomizer) exec(inst instance, atom Atom) {
 	}
 }
 
-func (a *atomizer) distribute() {
+func (a *Atomizer) distribute() {
 	for {
 		select {
 		case <-a.ctx.Done():
