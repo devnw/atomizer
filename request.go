@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/gob"
 	"encoding/json"
+	"io"
 	"strings"
 	"time"
 )
@@ -44,7 +45,7 @@ type Request struct {
 	// the []byte for the actual atom instance. RawMessage is used to
 	// delay unmarshal of the payload information so the atom can do it
 	// internally
-	Payload []byte
+	Payload io.Reader
 
 	// m is the maker for instantiating the new atom
 	m *maker
@@ -107,10 +108,12 @@ func (e *Request) UnmarshalJSON(data []byte) error {
 
 	if jsonE.Payload != nil {
 		pay := strings.Trim(string(jsonE.Payload), "\"")
-		e.Payload, err = base64.StdEncoding.DecodeString(pay)
+		data, err = base64.StdEncoding.DecodeString(pay)
 		if err != nil {
-			e.Payload = jsonE.Payload
+			e.Payload = strings.NewReader(string(jsonE.Payload))
 		}
+
+		e.Payload = strings.NewReader(string(data))
 	}
 
 	return nil
@@ -118,6 +121,11 @@ func (e *Request) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON implements the custom json marshaler for electron
 func (e *Request) MarshalJSON() ([]byte, error) {
+	data, err := io.ReadAll(e.Payload)
+	if err != nil {
+		return nil, err
+	}
+
 	return json.Marshal(&struct {
 		Origin    string          `json:"origin"`
 		ID        string          `json:"id"`
@@ -130,7 +138,7 @@ func (e *Request) MarshalJSON() ([]byte, error) {
 		ID:      e.ID,
 		AtomID:  e.ProcessorID,
 		Timeout: e.timeout,
-		Payload: json.RawMessage(e.Payload),
+		Payload: json.RawMessage(data),
 	})
 }
 

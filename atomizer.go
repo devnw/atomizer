@@ -18,11 +18,8 @@ import (
 	"go.devnw.com/validator"
 )
 
-// Atomize initialize instance of the atomizer to start reading from
-// conductors and execute bonded electrons/atoms
-//
-// NOTE: Registrations can be added through this method and OVERRIDE any
-// existing registrations of the same Atom or Conductor.
+// Atomize initializes an instance of the atomizer engine using the supplied
+// options and returns the new atomizer
 func Atomize(
 	ctx context.Context,
 	options ...Option,
@@ -47,16 +44,12 @@ func Atomize(
 	return a, nil
 }
 
-// Atomizer facilitates the execution of tasks (aka Electrons) which
-// are received from the configured sources these electrons can be
-// distributed across many instances of the atomizer on different nodes
-// in a distributed system or in memory. Atoms should be created to
-// process "atomic" actions which are small in scope and overall processing
-// complexity minimizing time to run and allowing for the distributed
-// system to take on the burden of long running processes as a whole
-// rather than a single process handling the overall load
+// Atomizer facilitates the execution of processing requests which
+// are received from the registered transports and processed by the
+// registered processors.
 type Atomizer struct {
-	procs map[string]*maker
+	procsMu sync.RWMutex
+	procs   map[string]*maker
 
 	// Requests Channel
 	requests chan instance

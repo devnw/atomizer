@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"time"
 )
 
@@ -24,7 +25,7 @@ type Response struct {
 	Start       time.Time
 	End         time.Time
 	Error       error
-	Result      []byte
+	Result      io.Reader
 }
 
 // UnmarshalJSON reads in a []byte of JSON data and maps it to the Properties

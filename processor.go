@@ -7,6 +7,8 @@ package engine
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"reflect"
 
 	"go.devnw.com/event"
@@ -15,7 +17,7 @@ import (
 // Processor is an atomic action with process method for the atomizer to execute
 // the Processor
 type Processor interface {
-	Process(context.Context, []byte) ([]byte, error)
+	Process(context.Context, io.Reader) (io.Reader, error)
 }
 
 type pWrapper struct {
@@ -24,14 +26,20 @@ type pWrapper struct {
 }
 
 func (p *pWrapper) Process(
-	ctx context.Context, data []byte,
-) ([]byte, error) {
-	out, err := p.Processor.Process(ctx, data)
-	if err != nil {
-		return out, err
-	}
+	ctx context.Context, data io.Reader,
+) (out io.Reader, err error) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			err = &Error{
+				Msg:   fmt.Sprintf("panic while processing: %v", r),
+				Inner: err,
+			}
+		}
+	}()
 
-	return out, err
+	out, err = p.Processor.Process(ctx, data)
+	return
 }
 
 type maker struct {
