@@ -18,7 +18,7 @@ import (
 // Properties is the struct for storing properties information after the
 // processing of an atom has completed so that it can be sent to the
 // original requestor
-type Properties struct {
+type Response struct {
 	RequestID   string
 	ProcessorID string
 	Start       time.Time
@@ -29,7 +29,7 @@ type Properties struct {
 
 // UnmarshalJSON reads in a []byte of JSON data and maps it to the Properties
 // struct properly for use throughout Atomizer
-func (p *Properties) UnmarshalJSON(data []byte) error {
+func (p *Response) UnmarshalJSON(data []byte) error {
 	jsonP := struct {
 		ElectronID string          `json:"electronId"`
 		AtomID     string          `json:"atomId"`
@@ -64,7 +64,7 @@ func (p *Properties) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON implements the custom json marshaler for properties
-func (p *Properties) MarshalJSON() ([]byte, error) {
+func (p *Response) MarshalJSON() ([]byte, error) {
 	var eString []byte
 	if p.Error != nil {
 		_, ok := p.Error.(*Error)
@@ -98,7 +98,7 @@ func (p *Properties) MarshalJSON() ([]byte, error) {
 
 // Equal determines if two properties structs are equal to eachother
 // TODO: Should this use reflect.DeepEqual?
-func (p *Properties) Equal(p2 *Properties) bool {
+func (p *Response) Equal(p2 *Response) bool {
 	var eEquals bool
 	if p.Error != nil {
 		if p2.Error != nil {

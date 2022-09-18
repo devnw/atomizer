@@ -7,10 +7,10 @@ package engine
 
 import "context"
 
-// Conductor is the interface that should be implemented for passing
+// Transport is the interface that should be implemented for passing
 // electrons to the atomizer that need processing. This should generally be
 // registered with the atomizer in an initialization script
-type Conductor interface {
+type Transport interface {
 
 	// Receive gets the atoms from the source
 	// that are available to atomize
@@ -18,11 +18,11 @@ type Conductor interface {
 
 	// Complete mark the completion of an electron instance
 	// with applicable statistics
-	Complete(ctx context.Context, p *Properties) error
+	Complete(ctx context.Context, p *Response) error
 
 	// Send sends electrons back out through the conductor for
 	// additional processing
-	Send(ctx context.Context, electron *Request) (<-chan *Properties, error)
+	Send(ctx context.Context, r *Request) (<-chan *Response, error)
 
 	// Close cleans up the conductor
 	Close()

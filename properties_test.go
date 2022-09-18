@@ -14,7 +14,7 @@ var nooppropNob64ErrJSON = `{"electronId":"test","atomId":"test","starttime":"00
 
 var nooppropJSON = `{"electronId":"test","atomId":"test","starttime":"0001-01-01T00:00:00Z","endtime":"0001-01-01T00:00:00Z","result":{"result":"test"}}`
 
-var noopprop = &Properties{
+var noopprop = &Response{
 	RequestID:   "test",
 	ProcessorID: "test",
 	Start:       time.Time{},
@@ -27,7 +27,7 @@ var nooppropErrJSON = `{"electronId":"test","atomId":"test","starttime":"0001-01
 
 var nooppropNoMatchErrJSON = `{"electronId":"test","atomId":"test","starttime":"0001-01-01T00:00:00Z","endtime":"0001-01-01T00:00:00Z","error":"eyJub21hdGNoIjoibm9tYXRjaCJ9","result":{"result":"test"}}`
 
-var nooppropErr = &Properties{
+var nooppropErr = &Response{
 	RequestID:   "test",
 	ProcessorID: "test",
 	Start:       time.Time{},
@@ -40,7 +40,7 @@ var nooppropNonAtomErrJSON = `{"electronId":"test","atomId":"test","starttime":"
 
 var nooppropNonAtomNoMatchErrJSON = `{"electronId":"test","atomId":"test","starttime":"0001-01-01T00:00:00Z","endtime":"0001-01-01T00:00:00Z","error":"eyJub21hdGNoIjoibm9tYXRjaCJ9","result":{"result":"test"}}`
 
-var nooppropNonAtomErr = &Properties{
+var nooppropNonAtomErr = &Response{
 	RequestID:   "test",
 	ProcessorID: "test",
 	Start:       time.Time{},
@@ -52,7 +52,7 @@ var nooppropNonAtomErr = &Properties{
 func TestProperties_MarshalJSON(t *testing.T) {
 	tests := []struct {
 		name string
-		p    *Properties
+		p    *Response
 		json string
 		err  bool
 	}{
@@ -103,7 +103,7 @@ func TestProperties_MarshalJSON(t *testing.T) {
 func TestProperties_UnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name  string
-		p     *Properties
+		p     *Response
 		json  string
 		equal bool
 		err   bool
@@ -152,7 +152,7 @@ func TestProperties_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			"invalid json blob",
-			&Properties{},
+			&Response{},
 			`{"empty"}`,
 			false,
 			true,
@@ -161,7 +161,7 @@ func TestProperties_UnmarshalJSON(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := &Properties{}
+			p := &Response{}
 			err := json.Unmarshal([]byte(test.json), &p)
 
 			if err != nil && !test.err {

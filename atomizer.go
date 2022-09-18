@@ -25,16 +25,11 @@ import (
 // existing registrations of the same Atom or Conductor.
 func Atomize(
 	ctx context.Context,
-	registrations ...any,
+	options ...Option,
 ) (*Atomizer, error) {
-	err := Register(registrations...)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := _ctx(ctx)
 
-	return &Atomizer{
+	a := &Atomizer{
 		ctx:      ctx,
 		cancel:   cancel,
 		requests: make(chan instance),
@@ -42,10 +37,17 @@ func Atomize(
 		reg:      make(chan any),
 		atoms:    make(map[string]chan<- instance),
 		pub:      event.NewPublisher(ctx),
-	}, nil
+	}
+
+	// Apply the options
+	for _, opt := range options {
+		opt(a)
+	}
+
+	return a, nil
 }
 
-// atomizer facilitates the execution of tasks (aka Electrons) which
+// Atomizer facilitates the execution of tasks (aka Electrons) which
 // are received from the configured sources these electrons can be
 // distributed across many instances of the atomizer on different nodes
 // in a distributed system or in memory. Atoms should be created to
@@ -54,6 +56,7 @@ func Atomize(
 // system to take on the burden of long running processes as a whole
 // rather than a single process handling the overall load
 type Atomizer struct {
+	procs map[string]*maker
 
 	// Requests Channel
 	requests chan instance
@@ -70,22 +73,12 @@ type Atomizer struct {
 	atomsMu sync.RWMutex
 	atoms   map[string]chan<- instance
 
-	pub *event.Publisher
+	pub Publisher
 
 	ctx    context.Context
 	cancel context.CancelFunc
 
 	execOnce sync.Once
-}
-
-// Events returns an go.devnw.com/event.EventStream for the atomizer
-func (a *Atomizer) Events(buffer int) event.EventStream {
-	return a.pub.ReadEvents(buffer)
-}
-
-// Errors returns an go.devnw.com/event.ErrorStream for the atomizer
-func (a *Atomizer) Errors(buffer int) event.ErrorStream {
-	return a.pub.ReadErrors(buffer)
 }
 
 // Exec kicks off the processing of the atomizer by pulling in the
@@ -139,7 +132,7 @@ func (a *Atomizer) Register(values ...any) (err error) {
 		}
 
 		switch v := value.(type) {
-		case Conductor, Processor:
+		case Transport, Processor:
 			// Pass the value on the registrations
 			// channel to be received
 			select {
@@ -219,7 +212,7 @@ func (a *Atomizer) register(input any) {
 	}
 
 	switch v := input.(type) {
-	case Conductor:
+	case Transport:
 		err := a.receiveConductor(v)
 		if err == nil {
 			a.pub.EventFunc(a.ctx, func() event.Event {
@@ -253,7 +246,7 @@ func (a *Atomizer) register(input any) {
 }
 
 // receiveConductor setups a retrieval loop for the conductor
-func (a *Atomizer) receiveConductor(conductor Conductor) error {
+func (a *Atomizer) receiveConductor(conductor Transport) error {
 	if !validator.Valid(conductor) {
 		return &Error{
 			Msg:  "invalid conductor",
@@ -268,7 +261,7 @@ func (a *Atomizer) receiveConductor(conductor Conductor) error {
 
 // conduct reads in from a specific electron channel of a conductor and drop
 // it onto the atomizer channel for electrons
-func (a *Atomizer) conduct(ctx context.Context, conductor Conductor) {
+func (a *Atomizer) conduct(ctx context.Context, conductor Transport) {
 	// Self Heal - Re-place the conductor on the register channel for
 	// the atomizer to re-initialize so this stack can be
 	// garbage collected
@@ -308,7 +301,7 @@ func (a *Atomizer) conduct(ctx context.Context, conductor Conductor) {
 						},
 						Inner: conductor.Complete(
 							ctx,
-							&Properties{
+							&Response{
 								RequestID:   e.ID,
 								ProcessorID: e.ProcessorID,
 								Start:       time.Now(),

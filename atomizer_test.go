@@ -102,7 +102,7 @@ func check(
 	t *testing.T,
 	test *tresult,
 	e *Request,
-	result <-chan *Properties,
+	result <-chan *Response,
 ) {
 	// Block until a result is returned from the instance
 	select {
@@ -359,7 +359,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 
 	t.Logf("[%v] tests loaded", len(tests))
 
-	results := make(chan Properties)
+	results := make(chan Response)
 
 	go func() {
 		defer cancel()
@@ -392,7 +392,7 @@ func TestAtomizer_Exec_Returner(t *testing.T) {
 func sentAndEval(
 	ctx context.Context,
 	t *testing.T,
-	c Conductor,
+	c Transport,
 	test *tresult,
 ) {
 	// Send the electron onto the conductor

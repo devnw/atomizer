@@ -19,7 +19,7 @@ func Test_instance_bond(t *testing.T) {
 			instance{
 				req:    noopelectron,
 				trans:  &noopconductor{},
-				prop:   &Properties{},
+				prop:   &Response{},
 				ctx:    ctx,
 				cancel: cancel,
 			},
@@ -30,7 +30,7 @@ func Test_instance_bond(t *testing.T) {
 			"invalid instance / missing electron",
 			instance{
 				trans:  &noopconductor{},
-				prop:   &Properties{},
+				prop:   &Response{},
 				ctx:    ctx,
 				cancel: cancel,
 			},
@@ -41,7 +41,7 @@ func Test_instance_bond(t *testing.T) {
 			"invalid instance / missing conductor",
 			instance{
 				req:    noopelectron,
-				prop:   &Properties{},
+				prop:   &Response{},
 				ctx:    ctx,
 				cancel: cancel,
 			},
@@ -53,7 +53,7 @@ func Test_instance_bond(t *testing.T) {
 			instance{
 				req:    noopelectron,
 				trans:  &noopconductor{},
-				prop:   &Properties{},
+				prop:   &Response{},
 				ctx:    ctx,
 				cancel: cancel,
 			},
@@ -89,7 +89,7 @@ func Test_instance_complete(t *testing.T) {
 			instance{
 				req:    noopelectron,
 				trans:  &noopconductor{},
-				prop:   &Properties{},
+				prop:   &Response{},
 				ctx:    ctx,
 				cancel: cancel,
 			},
@@ -124,7 +124,7 @@ func Test_instance_execute(t *testing.T) {
 			instance{
 				req:   noopelectron,
 				trans: &noopconductor{},
-				prop:  &Properties{},
+				prop:  &Response{},
 				proc:  &noopatom{},
 			},
 			false,
@@ -133,7 +133,7 @@ func Test_instance_execute(t *testing.T) {
 			"invalid instance - no electron",
 			instance{
 				trans: &noopconductor{},
-				prop:  &Properties{},
+				prop:  &Response{},
 				proc:  &noopatom{},
 			},
 			true,
@@ -142,7 +142,7 @@ func Test_instance_execute(t *testing.T) {
 			"invalid instance - no conductor",
 			instance{
 				req:  noopelectron,
-				prop: &Properties{},
+				prop: &Response{},
 				proc: &noopatom{},
 			},
 			true,
@@ -152,7 +152,7 @@ func Test_instance_execute(t *testing.T) {
 			instance{
 				req:   noopelectron,
 				trans: &noopconductor{},
-				prop:  &Properties{},
+				prop:  &Response{},
 			},
 			true,
 		},
@@ -161,7 +161,7 @@ func Test_instance_execute(t *testing.T) {
 			instance{
 				req:   noopelectron,
 				trans: &noopconductor{},
-				prop:  &Properties{},
+				prop:  &Response{},
 				proc:  &panicatom{},
 			},
 			true,

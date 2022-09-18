@@ -74,7 +74,7 @@ func Register(values ...any) error {
 		case Processor:
 			// Register the atom
 			registrant.Store(ID(v), &maker{v})
-		case Conductor:
+		case Transport:
 			// Registrations using the same key will
 			// be overridden
 			registrant.Store(ID(v), v)

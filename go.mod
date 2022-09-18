@@ -12,10 +12,7 @@ require (
 	go.devnw.com/alog v1.1.1
 	go.devnw.com/event v1.0.3
 	go.devnw.com/validator v1.0.8
+	go.structs.dev/gen v1.0.1
 )
 
-require (
-	go.atomizer.io/stream v1.0.7 // indirect
-	go.structs.dev/gen v1.0.1 // indirect
-	golang.org/x/text v0.3.2 // indirect
-)
+require golang.org/x/text v0.3.7 // indirect

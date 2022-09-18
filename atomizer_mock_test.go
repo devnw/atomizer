@@ -41,7 +41,7 @@ func (*noopconductor) Receive(ctx context.Context) <-chan *Request {
 func (*noopconductor) Send(
 	ctx context.Context,
 	electron *Request,
-) (<-chan *Properties, error) {
+) (<-chan *Response, error) {
 	return nil, nil
 }
 
@@ -49,7 +49,7 @@ func (*noopconductor) Close() {}
 
 func (*noopconductor) Complete(
 	ctx context.Context,
-	properties *Properties,
+	properties *Response,
 ) error {
 	return nil
 }
@@ -58,7 +58,7 @@ type noopatom struct{}
 
 func (*noopatom) Process(
 	ctx context.Context,
-	conductor Conductor,
+	conductor Transport,
 	electron *Request,
 ) ([]byte, error) {
 	return nil, nil
@@ -68,7 +68,7 @@ type panicatom struct{}
 
 func (*panicatom) Process(
 	ctx context.Context,
-	conductor Conductor,
+	conductor Transport,
 	electron *Request,
 ) ([]byte, error) {
 	panic("test panic")
@@ -78,7 +78,7 @@ type invalidatom struct{}
 
 func (*invalidatom) Process(
 	ctx context.Context,
-	conductor Conductor,
+	conductor Transport,
 	electron *Request,
 ) ([]byte, error) {
 	return nil, nil
@@ -100,7 +100,7 @@ func (cond *validconductor) Receive(ctx context.Context) <-chan *Request {
 func (cond *validconductor) Send(
 	ctx context.Context,
 	electron *Request,
-) (response <-chan *Properties, err error) {
+) (response <-chan *Response, err error) {
 	return response, err
 }
 
@@ -110,7 +110,7 @@ func (cond *validconductor) Validate() (valid bool) {
 
 func (cond *validconductor) Complete(
 	ctx context.Context,
-	properties *Properties,
+	properties *Response,
 ) (err error) {
 	return err
 }
@@ -129,7 +129,7 @@ func (pt *passthrough) Receive(ctx context.Context) <-chan *Request {
 
 func (pt *passthrough) Validate() bool { return pt.input != nil }
 
-func (pt *passthrough) Complete(ctx context.Context, p *Properties) error {
+func (pt *passthrough) Complete(ctx context.Context, p *Response) error {
 	if !validator.Valid(p) {
 		return errors.Errorf(
 			"invalid properties returned for electron [%s]",
@@ -153,7 +153,7 @@ func (pt *passthrough) Complete(ctx context.Context, p *Properties) error {
 		)
 	}
 
-	resultChan, ok := value.(chan *Properties)
+	resultChan, ok := value.(chan *Response)
 	if !ok {
 		return errors.New("unable to type assert electron properties channel")
 	}
@@ -172,11 +172,11 @@ func (pt *passthrough) Complete(ctx context.Context, p *Properties) error {
 func (pt *passthrough) Send(
 	ctx context.Context,
 	electron *Request,
-) (<-chan *Properties, error) {
+) (<-chan *Response, error) {
 	var err error
-	result := make(chan *Properties)
+	result := make(chan *Response)
 
-	go func(result chan *Properties) {
+	go func(result chan *Response) {
 		// Only kick off the electron for processing if there isn't already an
 		// instance loaded in the system
 		if _, loaded := pt.results.LoadOrStore(electron.ID, result); !loaded {
@@ -189,7 +189,7 @@ func (pt *passthrough) Send(
 			}
 		} else {
 			defer close(result)
-			p := &Properties{}
+			p := &Response{}
 			alog.Errorf(nil, "duplicate electron registration for EID [%s]", electron.ID)
 
 			result <- p
@@ -205,11 +205,11 @@ type printer struct{ t *testing.T }
 
 type state struct{ ID string }
 
-func (s *state) Process(ctx context.Context, conductor Conductor, electron *Request) (result []byte, err error) {
+func (s *state) Process(ctx context.Context, conductor Transport, electron *Request) (result []byte, err error) {
 	return []byte(s.ID), nil
 }
 
-func (p *printer) Process(ctx context.Context, conductor Conductor, electron *Request) (result []byte, err error) {
+func (p *printer) Process(ctx context.Context, conductor Transport, electron *Request) (result []byte, err error) {
 	if validator.Valid(electron) {
 		var payload printerdata
 
@@ -223,7 +223,7 @@ func (p *printer) Process(ctx context.Context, conductor Conductor, electron *Re
 
 type returner struct{}
 
-func (b *returner) Process(ctx context.Context, conductor Conductor, electron *Request) (result []byte, err error) {
+func (b *returner) Process(ctx context.Context, conductor Transport, electron *Request) (result []byte, err error) {
 	if !validator.Valid(electron) {
 		return nil, errors.New("invalid electron")
 	}
@@ -278,7 +278,7 @@ func harness(
 	ctx context.Context,
 	buffer int,
 	atoms ...Processor,
-) (Conductor, event.EventStream, error) {
+) (Transport, event.EventStream, error) {
 	pass := &passthrough{
 		input: make(chan *Request, 1),
 	}

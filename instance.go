@@ -15,9 +15,9 @@ import (
 
 type instance struct {
 	req    *Request
-	trans  Conductor
+	trans  Transport
 	proc   Processor
-	prop   *Properties
+	prop   *Response
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -106,7 +106,7 @@ func (i *instance) execute(ctx context.Context) (err error) {
 	// Establish internal context
 	i.ctx, i.cancel = i.req.Context(ctx)
 
-	i.prop = &Properties{
+	i.prop = &Response{
 		RequestID:   i.req.ID,
 		ProcessorID: ID(i.proc),
 		Start:       time.Now(),
