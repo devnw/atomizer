@@ -12,5 +12,5 @@ require (
 	go.devnw.com/alog v1.1.1
 	go.devnw.com/event v1.0.3
 	go.devnw.com/validator v1.0.8
-	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/text v0.3.8 // indirect
 )
