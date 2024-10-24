@@ -1,38 +1,37 @@
-exclude: '^package.json|package-lock.json$'
-fail_fast: false
+# Copyright (c) 2024 by SPYDER.
+#
+# This software is proprietary information of SPYDER.
+# Unauthorized use, copying, modification, distribution, and/or
+# disclosure is strictly prohibited, except as provided under the terms
+# of the commercial license agreement you have entered into with
+# SPYDER.
+#
+# For more details, see the LICENSE file in the root directory of this
+# source code repository or contact SPYDER at info@spyder.org.
+
+exclude: '^$'
+fail_fast: true 
 repos:
--   repo: https://github.com/Contrast-Labs/detect-secrets
-    rev: v1.1.2
-    hooks:
-    -   id: detect-secrets
-        name: Detect secrets
-        language: python
-        entry: detect-secrets-hook
-        args: ['--baseline', '.secrets.baseline']
--   repo: https://github.com/golangci/golangci-lint
-    rev: v1.45.2
-    hooks:
-    -   id: golangci-lint
--   repo: https://github.com/Bahjat/pre-commit-golang
-    rev: a4be1d0f860565649a450a8d480e541844c14a07 # pragma: allowlist secret
-    hooks:
-      - id: go-unit-tests
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.1.0
-    hooks:
-    -   id: check-json
-    -   id: check-added-large-files
-    -   id: no-commit-to-branch
-        args: ['--branch', 'main']
-    -   id: pretty-format-json
-        args: ['--autofix']
-    -   id: check-merge-conflict
-    -   id: check-yaml
--   repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.31.1
-    hooks:
-    -   id: markdownlint-fix
--   repo: https://github.com/koalaman/shellcheck-precommit
-    rev: v0.8.0
-    hooks:
-    -   id: shellcheck
+  -   repo: https://github.com/Yelp/detect-secrets
+      rev: v1.5.0
+      hooks:
+      -   id: detect-secrets
+          name: Detect secrets
+          language: python
+          entry: detect-secrets-hook
+          args: [
+            '--baseline', 
+            '.secrets.baseline',
+            '--exclude-files',
+            '(_test\.go$|/testdata/)',
+            ]
+  -   repo: https://github.com/sqlfluff/sqlfluff 
+      rev: 3.2.4
+      hooks:
+      -   id: sqlfluff-fix
+  -   repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v5.0.0
+      hooks:
+      -   id: check-json
+      -   id: check-merge-conflict
+      -   id: check-yaml
