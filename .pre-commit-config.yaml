@@ -1,14 +1,3 @@
-# Copyright (c) 2024 by SPYDER.
-#
-# This software is proprietary information of SPYDER.
-# Unauthorized use, copying, modification, distribution, and/or
-# disclosure is strictly prohibited, except as provided under the terms
-# of the commercial license agreement you have entered into with
-# SPYDER.
-#
-# For more details, see the LICENSE file in the root directory of this
-# source code repository or contact SPYDER at info@spyder.org.
-
 exclude: '^$'
 fail_fast: true 
 repos:
@@ -23,15 +12,35 @@ repos:
             '--baseline', 
             '.secrets.baseline',
             '--exclude-files',
-            '(_test\.go$|/testdata/)',
+            '(_test\.go$|/testdata/|gomod2nix.toml)',
             ]
-  -   repo: https://github.com/sqlfluff/sqlfluff 
-      rev: 3.2.4
-      hooks:
-      -   id: sqlfluff-fix
+  - repo: https://github.com/mrtazz/checkmake.git
+    rev: 0.2.2
+    hooks:
+    -   id: checkmake
   -   repo: https://github.com/pre-commit/pre-commit-hooks
       rev: v5.0.0
       hooks:
       -   id: check-json
       -   id: check-merge-conflict
       -   id: check-yaml
+      -   id: end-of-file-fixer
+      -   id: check-symlinks
+  - repo: https://github.com/markdownlint/markdownlint
+    rev: v0.12.0
+    hooks:
+    -   id: markdownlint
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.31.0
+    hooks:
+      - id: commitizen
+      - id: commitizen-branch
+        stages: [push]
+  - repo: local
+    hooks:
+      - id: makefile
+        name: Run Makefile Lint
+        entry: make
+        args: [pre-commit]
+        language: system
+        pass_filenames: false
